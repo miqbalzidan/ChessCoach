@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api';
 import { ErrorNote, Loading } from '../components/Chrome';
 import { relativeTime } from '../format';
+import { inSnapshotMode } from '../snapshot';
+import { SnapshotSettings } from './SnapshotSettings';
 import type { Job, Settings as SettingsData } from '../types';
 
 export function Settings({
@@ -13,6 +15,10 @@ export function Settings({
   onSelect: (username: string) => void;
   onChanged: () => void;
 }) {
+  // A snapshot has no server to configure, so this screen becomes an account of the
+  // file instead. Declared before the effects below so none of them ever run.
+  const snapshot = inSnapshotMode();
+
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [depth, setDepth] = useState(16);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +26,7 @@ export function Settings({
   const [job, setJob] = useState<Job | null>(null);
 
   useEffect(() => {
+    if (snapshot) return;
     api
       .settings()
       .then((data) => {
@@ -29,7 +36,7 @@ export function Settings({
       .catch((err: unknown) =>
         setError(err instanceof ApiError ? err.message : 'Could not load settings'),
       );
-  }, []);
+  }, [snapshot]);
 
   useEffect(() => {
     if (!job || job.status === 'done' || job.status === 'error') return;
@@ -45,6 +52,7 @@ export function Settings({
     return () => window.clearInterval(timer);
   }, [job, onChanged]);
 
+  if (snapshot) return <SnapshotSettings />;
   if (error) return <ErrorNote error={error} />;
   if (!settings) return <Loading label="loading settings" />;
 

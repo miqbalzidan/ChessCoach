@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
+import { inSnapshotMode } from '../snapshot';
 import { Board } from '../components/Board';
 import { ErrorNote, Loading } from '../components/Chrome';
 import { formatClock, formatDate, formatEval, glyphClass, timeControlLabel } from '../format';
@@ -131,9 +132,17 @@ export function Review() {
           {game.white_username} vs {game.black_username} —{' '}
           {timeControlLabel(game.time_control)} {game.time_class}, {formatDate(game.end_time)}.
         </div>
-        <button type="button" className="btn" onClick={runAnalysis} disabled={analysing}>
-          {analysing ? 'analysing…' : 'analyse this game'}
-        </button>
+        {inSnapshotMode() ? (
+          /* Analysis needs the engine, which lives on the computer that made this file. */
+          <div className="prose">
+            A snapshot carries results, not the engine. Analyse this game on the computer
+            and export again.
+          </div>
+        ) : (
+          <button type="button" className="btn" onClick={runAnalysis} disabled={analysing}>
+            {analysing ? 'analysing…' : 'analyse this game'}
+          </button>
+        )}
       </div>
     );
   }

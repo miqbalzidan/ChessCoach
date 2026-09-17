@@ -1,6 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import type { Scope, TimeClassSummary } from '../types';
 import { TIME_CLASSES } from '../types';
+import { activeSnapshot } from '../snapshot';
+import { pluralise, relativeTime } from '../format';
 
 const SECTIONS = [
   { to: '/', label: '01 sheet', end: true },
@@ -11,11 +13,26 @@ const SECTIONS = [
 ];
 
 export function Masthead({ username }: { username: string | null }) {
+  const snapshot = activeSnapshot();
+  // Importing needs an engine, so it is not a section of a snapshot.
+  const sections = snapshot ? SECTIONS.filter((section) => section.to !== '/import') : SECTIONS;
+
   return (
     <header className="masthead">
-      <div className="masthead-title">Leak sheet{username ? ` — ${username}` : ''}</div>
+      <div>
+        <div className="masthead-title">Leak sheet{username ? ` — ${username}` : ''}</div>
+        {snapshot && (
+          /* A snapshot is a photograph, and an undated photograph of your chess is
+             worse than none — it reads as today's form when it may be a month old. */
+          <div className="masthead-provenance">
+            snapshot · {pluralise(snapshot.games.length, 'game')} · taken{' '}
+            {relativeTime(snapshot.generatedAt)} · {snapshot.engine} depth{' '}
+            {snapshot.analysisDepth}
+          </div>
+        )}
+      </div>
       <nav className="masthead-nav">
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <NavLink
             key={section.to}
             to={section.to}

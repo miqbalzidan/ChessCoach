@@ -241,3 +241,39 @@ export interface Settings {
   coaching: 'claude' | 'offline';
   players: Player[];
 }
+
+/* ---------- snapshot ----------
+   A snapshot is the whole leak sheet frozen at a moment: everything the read-only
+   screens ask for, already computed. The phone has no engine and no database, so
+   anything not in here cannot be shown.
+
+   This type is the contract between the exporter (server/src/export.ts) and the
+   client that reads it. Both import it from this file, so a field added on one
+   side and forgotten on the other is a compile error rather than a blank panel
+   discovered on a phone. */
+
+export const SNAPSHOT_VERSION = 1;
+
+export interface SnapshotScope {
+  dashboard: Dashboard;
+  patterns: Pattern[];
+  /** Motif key → display label, as the patterns endpoint returns it. */
+  labels: Record<string, string>;
+  /** Null when a scope has no games worth coaching on. */
+  coaching: Coaching | null;
+}
+
+export interface Snapshot {
+  version: number;
+  /** Unix seconds — shown in the masthead so a stale sheet is never mistaken for a live one. */
+  generatedAt: number;
+  engine: string;
+  analysisDepth: number;
+  /** The minimum-occurrence cut-off the patterns were computed with. */
+  minOccurrences: number;
+  player: Player;
+  games: Game[];
+  /** Game id → its moves. Keys are strings because this survives JSON. */
+  moves: Record<string, Move[]>;
+  scopes: Record<Scope, SnapshotScope>;
+}

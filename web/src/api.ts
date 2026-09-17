@@ -11,6 +11,7 @@ import type {
   Settings,
   TimeClass,
 } from './types';
+import { inSnapshotMode, serveFromSnapshot, SnapshotError } from './snapshot';
 
 const BASE = '/api';
 
@@ -25,6 +26,17 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // With a snapshot loaded there is no server to ask. Every screen above this line
+  // is unchanged — they call the same api.* methods and never learn the difference.
+  if (inSnapshotMode()) {
+    try {
+      return serveFromSnapshot<T>(path, init);
+    } catch (error) {
+      if (error instanceof SnapshotError) throw new ApiError(error.message, error.status);
+      throw error;
+    }
+  }
+
   const response = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },

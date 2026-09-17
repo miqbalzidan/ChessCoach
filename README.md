@@ -52,33 +52,47 @@ npm run dev                  # API on :8787, UI on :5173
 
 Open http://localhost:5173 and import a username.
 
-### On a phone
+### On a phone — analyse on the computer, read anywhere
 
 The engine is a native Stockfish process and the database is a file on disk, so the
-phone is the screen, not the host. Run the app on a computer and open it from the
-handset over the same Wi-Fi:
+analysis stays on the computer. The results do not have to. Export a snapshot:
 
 ```bash
-npm run build && npm start        # or: npm run dev
+npm run build
+npm run export                    # → server/exports/leaksheet-<you>-<date>.html
+```
+
+That writes **one self-contained HTML file** — the whole app, every number, the board
+replay, the coaching text and the fonts, all inside it. Put it on your phone however you
+like (cable, Drive, mail it to yourself), open it, and the leak sheet is there. No server,
+no network, no install, nothing to keep running. The current 44-game database exports to
+about 1 MB.
+
+It also writes a `.leaksheet.json.gz` alongside it. That is the same data without the app
+wrapped around it: open it from **Settings → open snapshot** in an already-installed copy,
+and it is kept in IndexedDB so the phone remembers it.
+
+A snapshot is read-only by construction — importing and analysis need the engine. The
+masthead says when it was taken, so a month-old sheet is never mistaken for today's form.
+To update it, export again.
+
+Two flags, both rarely needed: `--coaching` asks Claude for any scope that has not got
+coaching cached yet, and `--with-fallback` adds an uncompressed copy of the payload for
+browsers without `DecompressionStream`, which roughly quadruples the file.
+
+### Reading it on the same network instead
+
+If the computer is on anyway, the phone can just open it over Wi-Fi — both servers bind
+every interface and the client calls the API at a relative `/api`:
+
+```bash
+npm start                         # or: npm run dev
 hostname -I                       # macOS: ipconfig getifaddr en0
 ```
 
-Then open `http://<that-address>:8787` on the phone — `:5173` if you used `npm run dev`.
-Both servers bind every interface, and the client calls the API at a relative `/api`, so
-no extra configuration is needed. If nothing loads, the computer's firewall is the usual
-cause. Vite rejects unknown *hostnames* for security, so use the IP address, or add the
-name to `server.allowedHosts`.
-
-In Chrome, **⋮ → Add to Home screen** installs it: standalone, no browser chrome, with
-the status bar carrying the masthead's bone. The layout reflows below 900px — stat tiles
-go two-up, the review screen stacks the board above the move sheet, the eval bar turns
-horizontal, and the time-class band becomes a swipeable strip.
-
-To run it *on* the phone instead, Termux can do it, but expect a build: Node from
-`pkg install nodejs`, a toolchain (`pkg install build-essential python`) for
-better-sqlite3's native module, and Stockfish compiled from source — there is no
-`pkg install stockfish`. Set `ENGINE_POOL_SIZE=1` and a lower `ANALYSIS_DEPTH`; a phone
-will not enjoy three engines at depth 16.
+Then `http://<that-address>:8787` on the phone (`:5173` under `npm run dev`). Use the IP
+rather than a hostname; Vite rejects unknown hostnames unless they are in
+`server.allowedHosts`. In Chrome, **⋮ → Add to Home screen** installs it standalone.
 
 ### No Chess.com access?
 
@@ -115,6 +129,10 @@ Everything is optional; the defaults work.
 
 Without an API key the app still works end to end — the coaching text is generated
 deterministically from the same numbers, in fewer words.
+
+The three typefaces are self-hosted from `web/public/fonts` (latin subsets, 224 KB over
+nine files) rather than fetched from Google, because an exported snapshot has to render
+with no network at all. `npm run fonts` regenerates them.
 
 ---
 
@@ -156,10 +174,13 @@ server/
   coach.ts       Claude coaching layer, with an offline fallback
   chesscom.ts    Public API client
   seed.ts        Offline demo-history generator
+  export.ts      Freezes a player into a portable snapshot
 web/
   screens/       Dashboard, Library, Review, Patterns, Import, Settings
   components/    Board, baseline bars, time-class band, masthead
+  snapshot.ts    Serves the read endpoints when there is no server
   styles.css     The design system
+  public/fonts/  Self-hosted typefaces, so an export needs no network
 ```
 
 ## Tests
@@ -168,8 +189,8 @@ web/
 npm test
 ```
 
-Covers the scoring model, PGN and clock parsing, time-class inference, motif detection
-and the aggregation layer. The analysis tests run a real engine against fixture games —
+Covers the scoring model, PGN and clock parsing, time-class inference, motif detection,
+the aggregation layer and snapshot inlining. The analysis tests run a real engine against fixture games —
 including checking that the app calls Morphy's 13.Rxd7 in the Opera Game brilliant.
 
 ---
@@ -187,3 +208,5 @@ The interface is a tournament scoresheet, not a dashboard of cards.
   blitz mistakes are a time-pressure signal, rapid mistakes are a preparation signal, and
   averaging the two hides both.
 - **Pieces are type**, not sprites — Unicode figurines, so the board scales anywhere.
+- **A snapshot says when it was taken.** The one risk of reading a frozen sheet is
+  mistaking last month's form for today's, so the date is in the masthead, not buried.

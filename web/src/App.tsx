@@ -8,6 +8,7 @@ import { Library } from './screens/Library';
 import { Patterns } from './screens/Patterns';
 import { Review } from './screens/Review';
 import { Settings } from './screens/Settings';
+import { inSnapshotMode } from './snapshot';
 import type { Scope } from './types';
 
 const ACTIVE_PLAYER_KEY = 'chesscoach.player';
@@ -15,6 +16,7 @@ const SCOPE_KEY = 'chesscoach.scope';
 
 export function App() {
   const navigate = useNavigate();
+  const snapshot = inSnapshotMode();
   const [username, setUsername] = useState<string | null>(() =>
     localStorage.getItem(ACTIVE_PLAYER_KEY),
   );
@@ -77,7 +79,7 @@ export function App() {
         <Route
           path="/"
           element={
-            checked && !username ? (
+            checked && !username && !snapshot ? (
               <Navigate to="/import" replace />
             ) : (
               <Dashboard
@@ -98,7 +100,10 @@ export function App() {
           path="/patterns"
           element={<Patterns username={username} scope={scope} onScopeChange={changeScope} />}
         />
-        <Route path="/import" element={<Import onImported={onImported} />} />
+        <Route
+          path="/import"
+          element={snapshot ? <Navigate to="/" replace /> : <Import onImported={onImported} />}
+        />
         <Route
           path="/settings"
           element={

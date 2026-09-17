@@ -1,6 +1,9 @@
 node_modules/
 dist/
 *.tsbuildinfo
+# Exported snapshots are build output: one per export, a megabyte each.
+# The fonts under web/public/fonts are vendored on purpose, so a build needs no network.
+exports/
 *.local
 .env
 .env.*

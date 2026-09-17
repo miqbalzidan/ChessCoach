@@ -926,6 +926,62 @@ a {
   }
 }
 
+/* ---------- snapshot ---------- */
+
+/* Sits under the masthead title in a read-only sheet. Quiet, but never absent: the
+   whole risk of a snapshot is reading last month's form as today's. */
+.masthead-provenance {
+  font: 400 11px/1.5 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(20, 19, 15, 0.45);
+  margin-top: 7px;
+}
+
+.snapshot-facts {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 0;
+  /* Aligns with .section-head above it rather than running to the page edge. */
+  margin: 0 var(--margin);
+}
+
+.snapshot-facts dt {
+  font: 400 11px/1 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(20, 19, 15, 0.5);
+  padding: 13px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.snapshot-facts dd {
+  margin: 0;
+  padding: 13px 0;
+  border-top: 1px solid var(--rule);
+  font: 400 15px/1.4 var(--body);
+}
+
+/* Everything in the snapshot panel shares the section gutter. */
+.snapshot-body {
+  margin: 0 var(--margin);
+  max-width: 62ch;
+}
+
+.snapshot-actions {
+  margin: 18px var(--margin) 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .snapshot-facts {
+    grid-template-columns: 96px 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
