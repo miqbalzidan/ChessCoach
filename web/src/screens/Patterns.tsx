@@ -233,28 +233,12 @@ function PatternCard({
       </button>
 
       {open && (
-        <div
-          style={{
-            padding: '20px 0 28px',
-            borderBottom: '1px solid var(--rule)',
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1fr) 320px',
-            gap: 'var(--margin)',
-            alignItems: 'start',
-          }}
-          className="pattern-detail"
-        >
+        <div className="pattern-detail">
           <div>
             <div className="label" style={{ marginBottom: 14 }}>
               where it happened
             </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
-                gap: 20,
-              }}
-            >
+            <div className="pattern-examples">
               {pattern.examples.map((example) => (
                 <button
                   key={`${example.gameId}-${example.ply}`}

@@ -679,6 +679,9 @@ a {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
+  /* The pieces size themselves from this box rather than from the viewport, so the
+     same component works at review size and at pattern-example size. */
+  container-type: inline-size;
   border: 1px solid var(--ink);
   background-image: repeating-conic-gradient(var(--board-light) 0 25%, var(--board-dark) 0 50%);
   background-size: 25% 25%;
@@ -715,6 +718,10 @@ a {
   position: absolute;
   width: 12.5%;
   height: 12.5%;
+  /* A square is 12.5% of the board, so the glyph is a share of the board's own
+     width. Sized from the viewport instead, a small board keeps a large board's
+     pieces and they spill across their squares. */
+  font-size: 8.5cqw;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -926,6 +933,25 @@ a {
   }
 }
 
+/* An expanded pattern: the boards on the left, the follow-up beside them. This
+   lives here rather than inline so the phone breakpoint below can collapse it —
+   an inline grid-template-columns cannot be overridden by a media query, and a
+   fixed 320px aside on a 412px screen lands on top of the boards. */
+.pattern-detail {
+  padding: 20px 0 28px;
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--margin);
+  align-items: start;
+}
+
+.pattern-examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 20px;
+}
+
 /* ---------- snapshot ---------- */
 
 /* Sits under the masthead title in a read-only sheet. Quiet, but never absent: the
@@ -979,6 +1005,11 @@ a {
 @media (max-width: 900px) {
   .snapshot-facts {
     grid-template-columns: 96px 1fr;
+  }
+
+  /* The follow-up reads after the boards it refers to, not beside them. */
+  .pattern-detail {
+    grid-template-columns: 1fr;
   }
 }
 

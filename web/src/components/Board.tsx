@@ -107,7 +107,7 @@ export function Board({ fen, move, bestMove, flipped = false, caption, children 
       : null;
 
   return (
-    <div className="board-wrap" style={{ fontSize: 'min(9vw, 52px)' }} role="img" aria-label={describe(squares)}>
+    <div className="board-wrap" role="img" aria-label={describe(squares)}>
       {best?.from && <div className="board-square square-best-from" style={best.from} />}
       {best?.to && <div className="board-square square-best-to" style={best.to} />}
       {played?.from && <div className="board-square square-from" style={played.from} />}
