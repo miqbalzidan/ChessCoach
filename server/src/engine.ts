@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { cpus } from 'node:os';
+import { existsSync, readdirSync } from 'node:fs';
+import { cpus, platform } from 'node:os';
+import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import type { EngineLine, Score } from './types.js';
 
@@ -9,15 +10,49 @@ const CANDIDATE_PATHS = [
   '/usr/games/stockfish',
   '/usr/local/bin/stockfish',
   '/opt/homebrew/bin/stockfish',
+  ...(platform() === 'win32' ? windowsCandidates() : []),
   'stockfish',
 ].filter((p): p is string => Boolean(p));
+
+/**
+ * winget (and choco/scoop) installs land the binary under a package-specific
+ * directory rather than on PATH as a plain `stockfish.exe`, so a bare command
+ * name never resolves on Windows even after a PATH refresh. This looks in the
+ * places those installers actually put it.
+ */
+function windowsCandidates(): string[] {
+  const candidates = [
+    'C:\\ProgramData\\chocolatey\\bin\\stockfish.exe',
+    process.env.USERPROFILE ? join(process.env.USERPROFILE, 'scoop\\shims\\stockfish.exe') : null,
+  ].filter((p): p is string => Boolean(p));
+
+  const wingetRoot = process.env.LOCALAPPDATA
+    ? join(process.env.LOCALAPPDATA, 'Microsoft\\WinGet\\Packages')
+    : null;
+  if (wingetRoot && existsSync(wingetRoot)) {
+    try {
+      const pkgDir = readdirSync(wingetRoot).find((name) => name.startsWith('Stockfish.Stockfish_'));
+      if (pkgDir) {
+        const stockfishDir = join(wingetRoot, pkgDir, 'stockfish');
+        if (existsSync(stockfishDir)) {
+          const exe = readdirSync(stockfishDir).find((name) => name.toLowerCase().endsWith('.exe'));
+          if (exe) candidates.push(join(stockfishDir, exe));
+        }
+      }
+    } catch {
+      // Best-effort discovery; fall through to the remaining candidates.
+    }
+  }
+
+  return candidates;
+}
 
 export function resolveStockfishPath(): string {
   for (const candidate of CANDIDATE_PATHS) {
     if (candidate === 'stockfish' || existsSync(candidate)) return candidate;
   }
   throw new Error(
-    'Stockfish not found. Install it (apt install stockfish / brew install stockfish) or set STOCKFISH_PATH.',
+    'Stockfish not found. Install it (apt install stockfish / brew install stockfish / winget install Stockfish.Stockfish) or set STOCKFISH_PATH.',
   );
 }
 
@@ -33,7 +68,7 @@ class Engine extends EventEmitter {
   private proc: ChildProcessWithoutNullStreams;
   private buffer = '';
   private pending: PendingSearch | null = null;
-  private readyWaiters: Array<() => void> = [];
+  private readyWaiters: Array<{ resolve: () => void; reject: (err: Error) => void }> = [];
   private currentMultipv = 0;
   name = 'stockfish';
 
@@ -70,7 +105,7 @@ class Engine extends EventEmitter {
     }
     if (line === 'readyok') {
       const waiter = this.readyWaiters.shift();
-      waiter?.();
+      waiter?.resolve();
       return;
     }
     if (!this.pending) return;
@@ -94,11 +129,18 @@ class Engine extends EventEmitter {
     const pending = this.pending;
     this.pending = null;
     pending?.reject(err);
+
+    // A dead process will never send readyok, so a spawn failure (e.g. a bad
+    // binary path) would otherwise leave `ready()` awaiting forever instead
+    // of surfacing as an import error.
+    const waiters = this.readyWaiters;
+    this.readyWaiters = [];
+    for (const waiter of waiters) waiter.reject(err);
   }
 
   private ready(): Promise<void> {
-    return new Promise((resolve) => {
-      this.readyWaiters.push(resolve);
+    return new Promise((resolve, reject) => {
+      this.readyWaiters.push({ resolve, reject });
       this.send('isready');
     });
   }
