@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.tsbuildinfo
+*.local
+.env
+.env.*
+!.env.example
+# Anchored patterns would only cover the repo root; the database lives in
+# server/data, so match the files wherever they are.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.DS_Store
+*.log
+.vite/
+coverage/
