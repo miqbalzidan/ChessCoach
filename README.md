@@ -40,7 +40,7 @@ class, with a plain-language coaching layer on top.
 
 ## Running it
 
-Requires Node 20+ and a Stockfish binary.
+Requires Node 22+ (better-sqlite3 needs it) and a Stockfish binary.
 
 ```bash
 # Stockfish
