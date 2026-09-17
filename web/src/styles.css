@@ -107,7 +107,14 @@ a {
   max-width: 1180px;
   margin: 0 auto;
   min-height: 100vh;
+  /* Android's address bar grows and shrinks as you scroll; dvh tracks that, vh does
+     not, and a stale vh leaves a bone-coloured gap under the last rule. */
+  min-height: 100dvh;
   background: var(--bone);
+  /* Installed to a home screen the page runs edge to edge, under the status bar and
+     the gesture pill, so the sheet carries the insets itself. Zero on desktop. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
 }
 
 .masthead {

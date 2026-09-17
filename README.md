@@ -52,6 +52,34 @@ npm run dev                  # API on :8787, UI on :5173
 
 Open http://localhost:5173 and import a username.
 
+### On a phone
+
+The engine is a native Stockfish process and the database is a file on disk, so the
+phone is the screen, not the host. Run the app on a computer and open it from the
+handset over the same Wi-Fi:
+
+```bash
+npm run build && npm start        # or: npm run dev
+hostname -I                       # macOS: ipconfig getifaddr en0
+```
+
+Then open `http://<that-address>:8787` on the phone — `:5173` if you used `npm run dev`.
+Both servers bind every interface, and the client calls the API at a relative `/api`, so
+no extra configuration is needed. If nothing loads, the computer's firewall is the usual
+cause. Vite rejects unknown *hostnames* for security, so use the IP address, or add the
+name to `server.allowedHosts`.
+
+In Chrome, **⋮ → Add to Home screen** installs it: standalone, no browser chrome, with
+the status bar carrying the masthead's bone. The layout reflows below 900px — stat tiles
+go two-up, the review screen stacks the board above the move sheet, the eval bar turns
+horizontal, and the time-class band becomes a swipeable strip.
+
+To run it *on* the phone instead, Termux can do it, but expect a build: Node from
+`pkg install nodejs`, a toolchain (`pkg install build-essential python`) for
+better-sqlite3's native module, and Stockfish compiled from source — there is no
+`pkg install stockfish`. Set `ENGINE_POOL_SIZE=1` and a lower `ANALYSIS_DEPTH`; a phone
+will not enjoy three engines at depth 16.
+
 ### No Chess.com access?
 
 Some networks block `api.chess.com`. The seed command generates a realistic history
