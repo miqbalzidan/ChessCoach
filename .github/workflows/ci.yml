@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push makes the previous run's answer irrelevant, so stop paying for it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # package.json claims >=20, so 20 is tested rather than assumed.
+        node: ['20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # The analysis tests run a real engine — they play the Opera Game and assert
+      # the app calls 13.Rxd7 brilliant. Without a binary they do not skip, they fail.
+      - name: Install Stockfish
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends stockfish
+          ls -l /usr/games/stockfish
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - run: npm run build
+
+      # The whole point of an export is that it needs nothing, so a build that has
+      # gone back to fetching fonts from a CDN is a regression worth failing on.
+      - name: Check the built app carries its own fonts
+        run: |
+          if grep -q "fonts.googleapis.com" web/dist/index.html; then
+            echo "web/dist/index.html still references Google Fonts."
+            echo "Snapshots must render with no network — run 'npm run fonts'."
+            exit 1
+          fi
+          test -f web/dist/fonts/fonts.css
+          echo "fonts are self-hosted"
