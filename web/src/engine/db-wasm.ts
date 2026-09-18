@@ -164,10 +164,33 @@ export interface OpenedDb {
 }
 
 /**
+ * Does this browser offer the storage the persistent database needs at all?
+ *
+ * Probed structurally rather than through DOM types: this file is also compiled by
+ * the server's test project, which has no DOM lib, and a type-only dependency there
+ * would be a build error for no benefit.
+ */
+function opfsAvailable(): boolean {
+  const scope = globalThis as Record<string, unknown>;
+  const nav = scope.navigator as { storage?: { getDirectory?: unknown } } | undefined;
+  const handle = scope.FileSystemFileHandle as { prototype?: object } | undefined;
+  return (
+    typeof nav?.storage?.getDirectory === 'function' &&
+    typeof handle?.prototype === 'object' &&
+    handle.prototype !== null &&
+    'createSyncAccessHandle' in handle.prototype
+  );
+}
+
+/**
  * Opens the phone's database, persistent if the browser allows it.
  *
- * Falls back to an in-memory database rather than refusing to start: a sheet that
- * works for this session is worth more than an error page, as long as it says so.
+ * Falling back to memory is right for a browser that has no OPFS — a sheet that works
+ * for this session beats an error page, as long as it says so. It is **wrong** when
+ * OPFS exists but the file is already held, which is what happens if a second Worker
+ * tries to open the same database: degrading silently there would hand someone a
+ * blank app and quietly throw away everything they imported into it. So the two cases
+ * are told apart, and only the first one degrades.
  */
 export async function openBrowserDb(filename = '/chesscoach.db'): Promise<OpenedDb> {
   const { default: sqlite3InitModule } = await import('@sqlite.org/sqlite-wasm');
@@ -177,11 +200,30 @@ export async function openBrowserDb(filename = '/chesscoach.db'): Promise<Opened
       Number((sqlite3 as any).capi.sqlite3_last_insert_rowid((db as any).pointer ?? db)),
   };
 
+  // One attempt, deliberately. A failed `installOpfsSAHPoolVfs` runs the library's own
+  // recovery, which tries to remove and recreate the pool — so retrying in a loop
+  // risks clearing the very database it is trying to open. The page terminates its
+  // Worker on `pagehide` instead, which releases the file before the next page asks
+  // for it; a short wait here covers the rest of that handover.
+  let lastError: unknown;
   try {
     const pool = await (sqlite3 as any).installOpfsSAHPoolVfs({ name: 'chesscoach' });
     return { db: wrapOo1Db(new pool.OpfsSAHPoolDb(filename) as Oo1Db, deps), persistent: true };
   } catch (error) {
-    console.warn('No OPFS storage available; this database will not survive a reload.', error);
-    return { db: wrapOo1Db(new (sqlite3 as any).oo1.DB(':memory:') as Oo1Db, deps), persistent: false };
+    lastError = error;
   }
+
+  if (opfsAvailable()) {
+    // Still held after several seconds, so it is genuinely somewhere else. Degrading
+    // to memory here would hand someone a blank app and quietly throw away everything
+    // they had imported, which is worse than saying so.
+    throw new Error(
+      'Your games are open in another tab. Close it and reload — a second copy here ' +
+        'would start from an empty database.',
+      { cause: lastError },
+    );
+  }
+
+  console.warn('No OPFS storage in this browser; nothing imported here will survive a reload.');
+  return { db: wrapOo1Db(new (sqlite3 as any).oo1.DB(':memory:') as Oo1Db, deps), persistent: false };
 }

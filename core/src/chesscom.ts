@@ -132,7 +132,7 @@ function archiveCouldContain(archiveUrl: string, since: number): boolean {
   return endOfMonth >= since;
 }
 
-export function normaliseGame(raw: RawPlayerGame, username: string): ImportedGame | null {
+export function normaliseGame(raw: RawPlayerGame, _username: string): ImportedGame | null {
   if (!raw.pgn) return null;
   // Variants share the endpoint but not the evaluation model.
   if (raw.rules && raw.rules !== 'chess') return null;

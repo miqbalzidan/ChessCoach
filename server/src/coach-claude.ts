@@ -10,9 +10,9 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import {
   buildBrief,
   CoachingSchema,
-  emptyCoaching,
   fallbackCoaching,
   now,
+  offlineCoaching,
   SYSTEM_PROMPT,
   type Coaching,
   type CoachingInput,
@@ -25,12 +25,7 @@ export function hasApiKey(): boolean {
 }
 
 export async function generateCoaching(input: CoachingInput): Promise<Coaching> {
-  if (input.patterns.length === 0) {
-    return { ...emptyCoaching(), model: 'none', generatedAt: now() };
-  }
-  if (!hasApiKey()) {
-    return { ...fallbackCoaching(input), model: 'offline', generatedAt: now() };
-  }
+  if (input.patterns.length === 0 || !hasApiKey()) return offlineCoaching(input);
 
   const client = new Anthropic();
   const brief = buildBrief(input);

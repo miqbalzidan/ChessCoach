@@ -15,6 +15,7 @@ import type {
   TimeClass,
 } from './types';
 import { inSnapshotMode, serveFromSnapshot, SnapshotError } from './snapshot';
+import { inLocalMode, LocalError, requestLocal } from './engine/local';
 
 const BASE = '/api';
 
@@ -28,14 +29,34 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The one place that decides where an answer comes from.
+ *
+ * Three backends now, and every screen above this line is unchanged — they call the
+ * same api.* methods and never learn which one served them:
+ *
+ *   a server,   over HTTP, when there is one;
+ *   a snapshot, from a frozen file, which can only be read;
+ *   this device, from a Worker holding the database and the engine.
+ *
+ * A snapshot wins over local mode: if you opened an exported sheet, that is the sheet
+ * you meant to look at, whatever else this browser has stored.
+ */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  // With a snapshot loaded there is no server to ask. Every screen above this line
-  // is unchanged — they call the same api.* methods and never learn the difference.
   if (inSnapshotMode()) {
     try {
       return serveFromSnapshot<T>(path, init);
     } catch (error) {
       if (error instanceof SnapshotError) throw new ApiError(error.message, error.status);
+      throw error;
+    }
+  }
+
+  if (inLocalMode()) {
+    try {
+      return await requestLocal<T>(path, init);
+    } catch (error) {
+      if (error instanceof LocalError) throw new ApiError(error.message, error.status);
       throw error;
     }
   }

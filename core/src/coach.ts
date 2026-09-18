@@ -202,6 +202,21 @@ export function fallbackCoaching(input: CoachingInput): z.infer<typeof CoachingS
   };
 }
 
+/**
+ * The summary a host with no model writes for itself.
+ *
+ * Both hosts need the same two-step decision — nothing to say yet, versus the
+ * deterministic summary — so it lives here rather than being written once in the
+ * server's Claude path and again in the phone's Worker. The phone has no API key and
+ * nowhere safe to keep one, so for it this is not a fallback: it is the writer.
+ */
+export function offlineCoaching(input: CoachingInput): Coaching {
+  if (input.patterns.length === 0) {
+    return { ...emptyCoaching(), model: 'none', generatedAt: now() };
+  }
+  return { ...fallbackCoaching(input), model: 'offline', generatedAt: now() };
+}
+
 export function now(): number {
   return Math.floor(Date.now() / 1000);
 }

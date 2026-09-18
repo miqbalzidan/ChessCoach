@@ -3,6 +3,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  worker: {
+    // The Worker loads SQLite and the engine with dynamic `import()`, which means
+    // code-splitting, which Vite's default IIFE worker output cannot do. It is also
+    // created as `{ type: 'module' }`, so ES is what it should have been either way.
+    format: 'es',
+  },
   optimizeDeps: {
     // sqlite-wasm loads its .wasm by a path relative to its own module. Pre-bundling
     // rewrites that module into one of Vite's own chunks, the relative path stops
