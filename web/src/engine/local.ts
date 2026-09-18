@@ -96,6 +96,17 @@ export function requestLocal<T>(path: string, init?: RequestInit): Promise<T> {
   });
 }
 
+/** Writes an exported snapshot's games into this device's own database. */
+export function seedFromFile(snapshot: unknown): Promise<{
+  player: string;
+  games: number;
+  moves: number;
+  duplicates: number;
+  mixedAnalysis: boolean;
+}> {
+  return requestLocal('/local/seed', { method: 'POST', body: JSON.stringify(snapshot) });
+}
+
 /**
  * How long an import of this many games would take here, measured on this device.
  * Returns null if the engine cannot be reached at all, in which case the caller

@@ -71,8 +71,14 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
   return null;
 }
 
-/** Reads a `.leaksheet.json.gz` (or plain `.json`) the person picked, and keeps it. */
-export async function importSnapshotFile(file: File): Promise<Snapshot> {
+/**
+ * Reads a `.leaksheet.json.gz` (or plain `.json`) without storing it.
+ *
+ * Separate from `importSnapshotFile` because seeding a device's own database wants
+ * the contents and emphatically not the side effect: storing it would put the reader
+ * into snapshot mode, which is read-only, which is the opposite of the point.
+ */
+export async function readSnapshotFile(file: File): Promise<Snapshot> {
   const buffer = await file.arrayBuffer();
   const looksGzipped = new Uint8Array(buffer.slice(0, 2)).join(',') === '31,139';
 
@@ -87,7 +93,12 @@ export async function importSnapshotFile(file: File): Promise<Snapshot> {
     text = new TextDecoder().decode(buffer);
   }
 
-  const snapshot = validate(JSON.parse(text) as Snapshot);
+  return validate(JSON.parse(text) as Snapshot);
+}
+
+/** Reads a snapshot file and keeps it, so this browser becomes its reader. */
+export async function importSnapshotFile(file: File): Promise<Snapshot> {
+  const snapshot = await readSnapshotFile(file);
   await idbPut(snapshot);
   active = snapshot;
   return snapshot;

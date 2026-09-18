@@ -41,6 +41,7 @@ import {
   runPgnImport,
 } from '../../../core/src/importer.js';
 import { offlineCoaching, readCachedCoaching, writeCachedCoaching } from '../../../core/src/coach.js';
+import { seedFromSnapshot, type SnapshotSeed } from '../../../core/src/seed-snapshot.js';
 import type { EnginePool } from '../../../core/src/engine.js';
 import { openBrowserDb } from './db-wasm.js';
 import { createWasmEnginePool, estimateImportSeconds, measureMsPerPosition } from './engine-wasm.js';
@@ -318,6 +319,13 @@ async function route(request: WorkerRequest): Promise<unknown> {
   /* ---------- routes the server has no need for ---------- */
 
   if (head === 'local') {
+    if (name === 'seed' && method === 'POST') {
+      // A computer already analysed these, at a depth this device would not attempt.
+      // Taking them as they are is the difference between starting in a few seconds
+      // and starting after an afternoon of analysis.
+      return seedFromSnapshot(handle, body as unknown as SnapshotSeed);
+    }
+
     if (name === 'estimate') {
       // What the import warning quotes. Measured on this device the first time it is
       // asked, then remembered — the probe costs a second and the answer does not

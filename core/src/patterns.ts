@@ -179,7 +179,11 @@ export function detectPatterns(
         AND g.analysed_at IS NOT NULL
         AND m.motifs <> ''
         AND m.classification IN ('inaccuracy','mistake','blunder')${narrowing}
-      ORDER BY m.win_percent_loss DESC`,
+      -- The tiebreak is not cosmetic: without it, equally costly mistakes come back
+      -- in whatever order the rows happen to sit in, so the same history analysed on
+      -- two machines lists its examples differently. Ordering on the game's own time
+      -- is stable across databases, which row ids are not.
+      ORDER BY m.win_percent_loss DESC, g.end_time DESC, m.ply`,
     )
     .all(lensParams(playerId, lens)) as MistakeRow[];
 

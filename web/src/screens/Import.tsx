@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
+import { estimateImport, inLocalMode } from '../engine/local';
 import { pluralise } from '../format';
+import { splitPgns } from '../../../core/src/importer';
 import { TIME_CLASSES, type Job, type TimeClass } from '../types';
 
 type Mode = 'chesscom' | 'pgn';
@@ -23,7 +25,35 @@ export function Import({ onImported }: { onImported: (username: string) => void 
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [estimate, setEstimate] = useState<{ games: number; seconds: number } | null>(null);
   const pollRef = useRef<number | null>(null);
+
+  const local = inLocalMode();
+  const gameCount = mode === 'pgn' ? splitPgns(pgn).length : limit;
+
+  /**
+   * On this device, an import is minutes of its own CPU, so it says how many before
+   * it starts rather than after. The number is measured here — the engine times its
+   * first few positions — because a phone is not a desktop and an estimate that is
+   * wrong by three times is worse than none: someone plans their evening around it.
+   */
+  useEffect(() => {
+    if (!local || gameCount <= 0) {
+      setEstimate(null);
+      return;
+    }
+    let cancelled = false;
+    // Measuring starts an engine, so it waits until the number has settled rather
+    // than firing on every keystroke in the PGN box.
+    const timer = window.setTimeout(async () => {
+      const measured = await estimateImport(gameCount);
+      if (!cancelled && measured) setEstimate({ games: gameCount, seconds: measured.seconds });
+    }, 600);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [local, gameCount]);
 
   // Progress is polled rather than streamed: an import is a handful of stage
   // changes over minutes, which does not justify a socket.
@@ -64,6 +94,8 @@ export function Import({ onImported }: { onImported: (username: string) => void 
     }
   };
 
+  const longImport = estimate !== null && estimate.seconds >= 120;
+
   const toggleClass = (timeClass: TimeClass) => {
     setTimeClasses((current) =>
       current.includes(timeClass)
@@ -84,7 +116,9 @@ export function Import({ onImported }: { onImported: (username: string) => void 
         </h1>
         <div className="headline-aside">
           Every move is run through Stockfish locally. Nothing is uploaded anywhere;
-          the database is a file on this machine.
+          {local
+            ? ' your games are stored in this browser, on this device.'
+            : ' the database is a file on this machine.'}
         </div>
       </div>
 
@@ -144,7 +178,11 @@ export function Import({ onImported }: { onImported: (username: string) => void 
                 ))}
               </div>
               <div className="meta" style={{ marginTop: 10 }}>
-                Newest first. Analysis takes roughly a second per game on this machine.
+                {/* In local mode the panel below quotes a figure measured on this very
+                    device, so a remembered average here would only contradict it. */}
+                {local
+                  ? 'Newest first. How long the analysis takes depends on this device — the estimate below is measured on it.'
+                  : 'Newest first. Analysis takes roughly a second per game on this machine.'}
               </div>
             </div>
 
@@ -179,6 +217,23 @@ export function Import({ onImported }: { onImported: (username: string) => void 
           </label>
         )}
 
+        {longImport && !busy && (
+          /* A warning, not a gate. Someone with no computer can and should press on;
+             they just should not discover the length of it forty minutes in. */
+          <div className="import-warning">
+            <div className="import-warning-time">
+              About {describeDuration(estimate!.seconds)}.
+            </div>
+            <div className="prose">
+              {pluralise(estimate!.games, 'game')} at roughly{' '}
+              {Math.round(estimate!.seconds / estimate!.games)}s each on this device. If you
+              have a computer, analysing there and opening the export in Settings is around
+              ten times faster and costs no battery. Otherwise this runs in the background —
+              you can leave and come back, and it picks up where it stopped.
+            </div>
+          </div>
+        )}
+
         <button
           type="button"
           className="btn"
@@ -191,7 +246,13 @@ export function Import({ onImported }: { onImported: (username: string) => void 
             (mode === 'chesscom' && timeClasses.length === 0)
           }
         >
-          {busy ? 'importing…' : submitting ? 'starting…' : 'import and analyse'}
+          {busy
+            ? 'importing…'
+            : submitting
+              ? 'starting…'
+              : longImport
+                ? `import and analyse anyway (${describeDuration(estimate!.seconds)})`
+                : 'import and analyse'}
         </button>
 
         {error && (
@@ -254,4 +315,13 @@ function JobProgress({ job, onOpen }: { job: Job; onOpen: () => void }) {
       )}
     </div>
   );
+}
+
+/** Minutes and hours, because "2760 seconds" is not a thing anyone plans around. */
+function describeDuration(seconds: number): string {
+  if (seconds < 90) return `${Math.max(1, Math.round(seconds))} seconds`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 90) return `${minutes} minutes`;
+  const hours = Math.round(seconds / 360) / 10;
+  return `${hours} hours`;
 }

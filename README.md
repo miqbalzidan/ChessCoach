@@ -99,6 +99,39 @@ Two flags, both rarely needed: `--coaching` asks Claude for any lens that has no
 coaching cached yet, and `--with-fallback` adds an uncompressed copy of the payload for
 browsers without `DecompressionStream`, which roughly quadruples the file.
 
+### No computer at all — run the whole thing on the phone
+
+If there is no computer in the picture, the phone can be the whole app: Stockfish runs
+in the browser as WebAssembly and your games live in it. **Settings → this device →
+run everything on this device.** Nothing is uploaded and nothing needs to be switched
+on somewhere else.
+
+**Archive on the computer, top up on the phone.** That is the shape this is built for,
+and it is worth following where you can:
+
+| | on a phone | on a computer |
+| --- | --- | --- |
+| a week's games (5) | seconds | seconds |
+| 50 games | a few minutes | under a minute |
+| a back archive (300) | the best part of an hour | a few minutes |
+
+So: analyse the archive on a computer, `npm run export`, and open the
+`.leaksheet.json.gz` under **Settings → start from a computer's export**. Those games
+arrive already analysed, at the depth the computer used — 44 games seed in about a
+second — and from then on the phone only has to keep up with what you play. Opening a
+newer export later adds just the games since.
+
+With no computer anywhere, import on the phone anyway. Before starting anything long
+the app says how long it will take, measured on that handset rather than guessed, and
+the analysis is resumable — leave and come back and it carries on. It is a warning,
+not a refusal.
+
+The phone analyses at depth 12 rather than the desktop's 16, and with a different
+build of Stockfish. On 179 moves of real games the two agreed on every blunder and
+differed only on two borderline inaccuracies, so the leaks are the same leaks — but
+the sheet says which engine and depth produced which games rather than pretending one
+instrument measured them all.
+
 ### Reading it on the same network instead
 
 If the computer is on anyway, the phone can just open it over Wi-Fi — both servers bind

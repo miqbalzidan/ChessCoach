@@ -1508,3 +1508,20 @@ a {
     max-height: none;
   }
 }
+
+/* ---------- the import warning ----------
+   Shown before a long analysis starts, not after. It is ink-on-paper rather than
+   vermilion: this is not an error, it is the length of the job. */
+
+.import-warning {
+  margin: 24px 0 0;
+  padding: 18px 20px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--mark);
+  background: var(--wash);
+}
+
+.import-warning-time {
+  font: 600 17px/1.2 var(--display);
+  margin-bottom: 8px;
+}
