@@ -11,13 +11,16 @@ import type {
   Dashboard,
   Game,
   GameResult,
+  Lens,
   Move,
+  OpeningRow,
   Pattern,
   Scope,
   Snapshot,
+  SnapshotScope,
   TimeClass,
 } from './types';
-import { SNAPSHOT_VERSION } from './types';
+import { lensKey, SNAPSHOT_VERSION } from './types';
 
 declare global {
   interface Window {
@@ -97,12 +100,20 @@ export async function clearStoredSnapshot(): Promise<void> {
 
 function validate(snapshot: Snapshot): Snapshot {
   if (!snapshot || typeof snapshot !== 'object') throw new Error('Not a snapshot.');
-  if (!snapshot.player || !snapshot.scopes) throw new Error('Snapshot is missing its contents.');
+  if (!snapshot.player) throw new Error('Snapshot is missing its contents.');
   if (snapshot.version > SNAPSHOT_VERSION) {
     throw new Error(
       `This snapshot was written by a newer version (${snapshot.version}). Update the app.`,
     );
   }
+
+  // Version 1 knew only about time classes. Reading its five scopes as five
+  // unfiltered lenses costs nothing and keeps already-exported files readable; the
+  // opening filter then simply has nothing to offer, which is the truth about them.
+  if (!snapshot.lenses && snapshot.scopes) {
+    snapshot.lenses = { ...snapshot.scopes } as Record<string, SnapshotScope>;
+  }
+  if (!snapshot.lenses) throw new Error('Snapshot is missing its contents.');
   return snapshot;
 }
 
@@ -134,7 +145,8 @@ export function serveFromSnapshot<T>(path: string, init?: RequestInit): T {
   // A base is required to parse a relative path; it is never used for anything.
   const url = new URL(path, 'http://snapshot.local');
   const segments = url.pathname.split('/').filter(Boolean);
-  const scope = parseScope(url.searchParams.get('scope'));
+  const lens = parseLens(url);
+  const scope = lens.scope;
 
   if (segments[0] === 'health') {
     return {
@@ -176,30 +188,39 @@ export function serveFromSnapshot<T>(path: string, init?: RequestInit): T {
     }
 
     if (tail === 'job') return { job: null } as T;
-    if (tail === 'dashboard') return snapshot.scopes[scope].dashboard as T;
+
+    if (tail === 'dashboard') {
+      const stored = view(snapshot, lens).dashboard;
+      return { ...stored, openings: servableOpenings(snapshot, scope) } as T;
+    }
+
+    if (tail === 'openings') {
+      return { scope, openings: servableOpenings(snapshot, scope) } as T;
+    }
 
     if (tail === 'profile') {
       // Older snapshots predate the scouting report; an empty one reads as "nothing
       // to say yet" rather than breaking the screen.
-      const stored = snapshot.scopes[scope].profile;
+      const stored = view(snapshot, lens).profile;
       return {
         scope,
+        lens,
         profile: stored ?? { strengths: [], weaknesses: [], games: 0, thin: true },
       } as T;
     }
 
     if (tail === 'patterns') {
       const min = Number(url.searchParams.get('min') ?? snapshot.minOccurrences);
-      const { patterns, labels } = snapshot.scopes[scope];
+      const { patterns, labels } = view(snapshot, lens);
       // Patterns were cut off at minOccurrences when exported, so a higher bar can be
       // applied here but a lower one cannot bring back what was never written.
-      return { scope, patterns: patterns.filter((p) => p.occurrences >= min), labels } as T;
+      return { scope, lens, patterns: patterns.filter((p) => p.occurrences >= min), labels } as T;
     }
 
     if (tail === 'coaching') {
-      const coaching = snapshot.scopes[scope].coaching;
+      const coaching = view(snapshot, lens).coaching;
       if (!coaching) throw new SnapshotError('No coaching in this snapshot', 404);
-      return { scope, coaching, cached: true } as T;
+      return { scope, lens, coaching, cached: true } as T;
     }
 
     if (tail === 'games') return listGames(snapshot, url) as T;
@@ -208,9 +229,45 @@ export function serveFromSnapshot<T>(path: string, init?: RequestInit): T {
   throw new SnapshotError(`Not available in a snapshot: ${url.pathname}`, 404);
 }
 
+/**
+ * The openings this file can actually be looked through.
+ *
+ * The menu the exporter stored is every opening the player has a sample of; the
+ * lenses it wrote are the ones it could compute. Those sets match for a snapshot
+ * written by this version, and do not for one written before the filter existed —
+ * so the menu is intersected with what is here. A picker that offers a lens the
+ * file cannot serve leads somewhere with no way back, which is worse than a picker
+ * with fewer entries.
+ */
+function servableOpenings(snapshot: Snapshot, scope: Scope): OpeningRow[] {
+  const menu = snapshot.lenses[scope]?.dashboard.openings ?? [];
+  return menu.filter((row) =>
+    Boolean(
+      snapshot.lenses[lensKey({ scope, eco: row.eco, color: row.color as 'white' | 'black' })],
+    ),
+  );
+}
+
+/**
+ * The sheet under one lens, or a clear refusal.
+ *
+ * A snapshot holds exactly the lenses the exporting machine could reach. Asking for
+ * one it never wrote is not a blank screen — it is a file that cannot answer the
+ * question, and saying so is the only honest response.
+ */
+function view(snapshot: Snapshot, lens: Lens): SnapshotScope {
+  const stored = snapshot.lenses[lensKey(lens)];
+  if (!stored) {
+    throw new SnapshotError('This snapshot has no numbers for that opening.', 404);
+  }
+  return stored;
+}
+
 /** Mirrors listGames() in server/src/store.ts, including its end_time DESC ordering. */
 function listGames(snapshot: Snapshot, url: URL): { games: Game[]; total: number } {
   const timeClass = url.searchParams.get('timeClass');
+  const eco = url.searchParams.get('eco');
+  const color = url.searchParams.get('color');
   const result = url.searchParams.get('result');
   const opponent = url.searchParams.get('opponent')?.toLowerCase();
   const analysedOnly = url.searchParams.get('analysedOnly') === 'true';
@@ -224,6 +281,8 @@ function listGames(snapshot: Snapshot, url: URL): { games: Game[]; total: number
       return false;
     }
     if (result && result !== 'all' && game.result !== (result as GameResult)) return false;
+    if (eco && game.eco !== eco) return false;
+    if (eco && color && game.player_color !== color) return false;
     if (opponent && !game.opponent.toLowerCase().includes(opponent)) return false;
     if (from && game.end_time < from) return false;
     if (to && game.end_time > to) return false;
@@ -241,9 +300,18 @@ function numberParam(url: URL, key: string): number | undefined {
   return Number.isFinite(value) ? value : undefined;
 }
 
-function parseScope(raw: string | null): Scope {
+function parseLens(url: URL): Lens {
   const scopes: Scope[] = ['all', 'bullet', 'blitz', 'rapid', 'daily'];
-  return scopes.includes(raw as Scope) ? (raw as Scope) : 'all';
+  const raw = url.searchParams.get('scope');
+  const lens: Lens = { scope: scopes.includes(raw as Scope) ? (raw as Scope) : 'all' };
+
+  const eco = url.searchParams.get('eco');
+  if (eco && /^[A-E][0-9]{2}$/.test(eco)) {
+    lens.eco = eco;
+    const color = url.searchParams.get('color');
+    if (color === 'white' || color === 'black') lens.color = color;
+  }
+  return lens;
 }
 
 /* ---------- IndexedDB ----------

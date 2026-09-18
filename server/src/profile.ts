@@ -12,17 +12,8 @@
  */
 import type { DB } from './db.js';
 import { round1 } from './evaluation.js';
-import type { Phase, TimeClass } from './types.js';
-
-export type Scope = TimeClass | 'all';
-
-function scopeClause(scope: Scope): string {
-  return scope === 'all' ? '' : ' AND g.time_class = @scope';
-}
-
-function params(playerId: number, scope: Scope): Record<string, unknown> {
-  return { player: playerId, scope: scope === 'all' ? null : scope };
-}
+import { lensClause, lensParams, type Lens } from './lens.js';
+import type { Phase } from './types.js';
 
 export interface Trait {
   key: string;
@@ -62,8 +53,8 @@ const PHASE_LABELS: Record<Phase, string> = {
   endgame: 'the endgame',
 };
 
-export function profile(db: DB, playerId: number, scope: Scope): Profile {
-  const p = params(playerId, scope);
+export function profile(db: DB, playerId: number, lens: Lens): Profile {
+  const p = lensParams(playerId, lens);
   const strengths: Trait[] = [];
   const weaknesses: Trait[] = [];
 
@@ -71,7 +62,7 @@ export function profile(db: DB, playerId: number, scope: Scope): Profile {
     db
       .prepare(
         `SELECT COUNT(*) AS n FROM games g
-          WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${scopeClause(scope)}`,
+          WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${lensClause(lens)}`,
       )
       .get(p) as { n: number }
   ).n;
@@ -80,11 +71,13 @@ export function profile(db: DB, playerId: number, scope: Scope): Profile {
     return { strengths, weaknesses, games, thin: true };
   }
 
-  addPhaseTraits(db, p, scope, strengths, weaknesses);
-  addAccuracyTrait(db, p, scope, strengths, weaknesses);
-  addResultTraits(db, p, scope, strengths, weaknesses);
-  addClockTrait(db, p, scope, strengths, weaknesses);
-  addOpeningTraits(db, p, scope, strengths, weaknesses);
+  addPhaseTraits(db, p, lens, strengths, weaknesses);
+  addAccuracyTrait(db, p, lens, strengths, weaknesses);
+  addResultTraits(db, p, lens, strengths, weaknesses);
+  addClockTrait(db, p, lens, strengths, weaknesses);
+  // With the sheet already narrowed to one opening, "you are comfortable in the
+  // Berlin" is not a finding, it is the filter read back.
+  if (!lens.eco) addOpeningTraits(db, p, lens, strengths, weaknesses);
 
   // Strongest signal first; a report is only useful if the top line is the big one.
   strengths.sort((a, b) => b.weight - a.weight);
@@ -97,7 +90,7 @@ export function profile(db: DB, playerId: number, scope: Scope): Profile {
 function addPhaseTraits(
   db: DB,
   p: Record<string, unknown>,
-  scope: Scope,
+  lens: Lens,
   strengths: Trait[],
   weaknesses: Trait[],
 ): void {
@@ -109,7 +102,7 @@ function addPhaseTraits(
               SUM(CASE WHEN m.is_player = 1 THEN 1 ELSE 0 END) AS moves
          FROM moves m
          JOIN games g ON g.id = m.game_id
-        WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${scopeClause(scope)}
+        WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${lensClause(lens)}
         GROUP BY m.phase`,
     )
     .all(p) as PhaseRow[];
@@ -146,7 +139,7 @@ function addPhaseTraits(
 function addAccuracyTrait(
   db: DB,
   p: Record<string, unknown>,
-  scope: Scope,
+  lens: Lens,
   strengths: Trait[],
   weaknesses: Trait[],
 ): void {
@@ -160,7 +153,7 @@ function addAccuracyTrait(
                    CASE WHEN m.classification = 'best' THEN 1.0 ELSE 0.0 END END) AS theirBestRate
          FROM moves m
          JOIN games g ON g.id = m.game_id
-        WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${scopeClause(scope)}`,
+        WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${lensClause(lens)}`,
     )
     .get(p) as { mine: number | null; theirs: number | null; bestRate: number | null; theirBestRate: number | null };
 
@@ -204,7 +197,7 @@ interface GameSwing {
 function addResultTraits(
   db: DB,
   p: Record<string, unknown>,
-  scope: Scope,
+  lens: Lens,
   strengths: Trait[],
   weaknesses: Trait[],
 ): void {
@@ -215,7 +208,7 @@ function addResultTraits(
               MIN(CASE WHEN m.color = g.player_color THEN m.eval_after ELSE -m.eval_after END) AS worst
          FROM games g
          JOIN moves m ON m.game_id = g.id
-        WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${scopeClause(scope)}
+        WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${lensClause(lens)}
         GROUP BY g.id`,
     )
     .all(p) as GameSwing[];
@@ -277,7 +270,7 @@ function addResultTraits(
 function addClockTrait(
   db: DB,
   p: Record<string, unknown>,
-  scope: Scope,
+  lens: Lens,
   strengths: Trait[],
   weaknesses: Trait[],
 ): void {
@@ -292,7 +285,7 @@ function addClockTrait(
         FROM moves m
         JOIN games g ON g.id = m.game_id
        WHERE g.player_id = @player AND m.is_player = 1 AND g.analysed_at IS NOT NULL
-         AND m.clock_after IS NOT NULL${scopeClause(scope)}`,
+         AND m.clock_after IS NOT NULL${lensClause(lens)}`,
     )
     .get(p) as { scramble: number | null; calm: number | null; scrambleMoves: number };
 
@@ -333,7 +326,7 @@ interface OpeningRow {
 function addOpeningTraits(
   db: DB,
   p: Record<string, unknown>,
-  scope: Scope,
+  lens: Lens,
   strengths: Trait[],
   weaknesses: Trait[],
 ): void {
@@ -343,7 +336,7 @@ function addOpeningTraits(
               AVG(CASE g.result WHEN 'win' THEN 1.0 WHEN 'draw' THEN 0.5 ELSE 0.0 END) AS score
          FROM games g
         WHERE g.player_id = @player AND g.analysed_at IS NOT NULL AND g.eco IS NOT NULL
-              ${scopeClause(scope)}
+              ${lensClause(lens)}
         GROUP BY g.eco
        HAVING COUNT(*) >= ${MIN_OPENING_GAMES}
         ORDER BY score DESC`,

@@ -14,6 +14,32 @@ export type Classification =
 
 export const TIME_CLASSES: TimeClass[] = ['bullet', 'blitz', 'rapid', 'daily'];
 
+/* ---------- the lens ----------
+   What the whole sheet is narrowed to. Time class was the only lens for a long
+   while; an opening is a second one, and the two compose — "the Berlin as Black,
+   in blitz" is a question the stored analysis can already answer.
+
+   Everything downstream takes a Lens rather than a Scope, so a report cannot be
+   computed for one narrowing and labelled with another. */
+
+export interface Lens {
+  scope: Scope;
+  /** ECO code, e.g. C65. Absent means every opening. */
+  eco?: string | null;
+  /** Which side the player had. Absent means both. */
+  color?: 'white' | 'black' | null;
+}
+
+/**
+ * One stable string per lens — the coaching cache key, the snapshot key, and the
+ * effect dependency on the client. An unfiltered lens keys as its bare scope, so
+ * `all` and `blitz` mean exactly what they always did.
+ */
+export function lensKey(lens: Lens): string {
+  if (!lens.eco) return lens.scope;
+  return lens.color ? `${lens.scope}:${lens.eco}:${lens.color}` : `${lens.scope}:${lens.eco}`;
+}
+
 /** Chess's own annotation vocabulary is the icon set. */
 export const GLYPH: Record<Classification, string> = {
   brilliant: '!!',
@@ -173,6 +199,9 @@ export interface TimeClassSummary {
 export interface Dashboard {
   player: Player;
   scope: Scope;
+  /** The narrowing these numbers were computed under, echoed back so a screen can
+   *  never label one lens's figures with another's. */
+  lens: Lens;
   headline: Headline;
   timeClasses: TimeClassSummary[];
   trend: TrendPoint[];
@@ -269,7 +298,7 @@ export interface Profile {
    side and forgotten on the other is a compile error rather than a blank panel
    discovered on a phone. */
 
-export const SNAPSHOT_VERSION = 1;
+export const SNAPSHOT_VERSION = 2;
 
 export interface SnapshotScope {
   dashboard: Dashboard;
@@ -293,5 +322,10 @@ export interface Snapshot {
   games: Game[];
   /** Game id → its moves. Keys are strings because this survives JSON. */
   moves: Record<string, Move[]>;
-  scopes: Record<Scope, SnapshotScope>;
+  /** Lens key → the whole sheet under that lens: the five time classes, plus one
+   *  entry per opening the picker can reach. A lens that was never exported cannot
+   *  be computed on a phone, so the picker only ever offers what is in here. */
+  lenses: Record<string, SnapshotScope>;
+  /** Version 1 snapshots, keyed by time class alone. Read on load, never written. */
+  scopes?: Record<Scope, SnapshotScope>;
 }

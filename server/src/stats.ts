@@ -1,23 +1,16 @@
 import type { DB } from './db.js';
 import { round1 } from './evaluation.js';
+import { lensClause, lensParams, withoutOpening, withScope, type Lens, type Scope } from './lens.js';
 import { TIME_CLASSES, type Phase, type TimeClass } from './types.js';
 
-export type Scope = TimeClass | 'all';
+export type { Lens, Scope };
 
-/** Player moves in scope, joined to their game. Every stat below narrows this. */
+/** Player moves in the lens, joined to their game. Every stat below narrows this. */
 const PLAYER_MOVES = `
   FROM moves m
   JOIN games g ON g.id = m.game_id
  WHERE g.player_id = @player AND m.is_player = 1 AND g.analysed_at IS NOT NULL
 `;
-
-function scopeClause(scope: Scope): string {
-  return scope === 'all' ? '' : ' AND g.time_class = @scope';
-}
-
-function params(playerId: number, scope: Scope): Record<string, unknown> {
-  return { player: playerId, scope: scope === 'all' ? null : scope };
-}
 
 export interface Headline {
   games: number;
@@ -32,9 +25,9 @@ export interface Headline {
   record: { win: number; loss: number; draw: number };
 }
 
-export function headline(db: DB, playerId: number, scope: Scope): Headline {
-  const p = params(playerId, scope);
-  const gameScope = scope === 'all' ? '' : ' AND time_class = @scope';
+export function headline(db: DB, playerId: number, lens: Lens): Headline {
+  const p = lensParams(playerId, lens);
+  const narrowing = lensClause(lens, '');
 
   const games = db
     .prepare(
@@ -44,7 +37,7 @@ export function headline(db: DB, playerId: number, scope: Scope): Headline {
          SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins,
          SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) AS losses,
          SUM(CASE WHEN result = 'draw' THEN 1 ELSE 0 END) AS draws
-       FROM games WHERE player_id = @player${gameScope}`,
+       FROM games WHERE player_id = @player${narrowing}`,
     )
     .get(p) as { total: number; analysed: number; wins: number; losses: number; draws: number };
 
@@ -54,13 +47,13 @@ export function headline(db: DB, playerId: number, scope: Scope): Headline {
          COUNT(*) AS moves,
          SUM(CASE WHEN m.classification = 'blunder' THEN 1 ELSE 0 END) AS blunders,
          AVG(m.accuracy) AS mean_accuracy
-       ${PLAYER_MOVES}${scopeClause(scope)}`,
+       ${PLAYER_MOVES}${lensClause(lens)}`,
     )
     .get(p) as { moves: number; blunders: number | null; mean_accuracy: number | null };
 
   const analysed = games.analysed ?? 0;
-  const accuracy = playerAccuracy(db, playerId, scope);
-  const previous = previousWindow(db, playerId, scope);
+  const accuracy = playerAccuracy(db, playerId, lens);
+  const previous = previousWindow(db, playerId, lens);
 
   return {
     games: games.total ?? 0,
@@ -72,22 +65,22 @@ export function headline(db: DB, playerId: number, scope: Scope): Headline {
       : round2((analysed > 0 ? (moveStats.blunders ?? 0) / analysed : 0) - previous.blundersPerGame),
     accuracy,
     accuracyDelta: previous.accuracy === null ? null : round1(accuracy - previous.accuracy),
-    medianCentipawnLoss: medianCentipawnLoss(db, playerId, scope),
+    medianCentipawnLoss: medianCentipawnLoss(db, playerId, lens),
     winRate: games.total > 0 ? round1(((games.wins ?? 0) / games.total) * 100) : 0,
     record: { win: games.wins ?? 0, loss: games.losses ?? 0, draw: games.draws ?? 0 },
   };
 }
 
 /** Game accuracy is stored per colour, so the player's side has to be picked out. */
-function playerAccuracy(db: DB, playerId: number, scope: Scope): number {
-  const gameScope = scope === 'all' ? '' : ' AND time_class = @scope';
+function playerAccuracy(db: DB, playerId: number, lens: Lens): number {
+  const narrowing = lensClause(lens, '');
   const row = db
     .prepare(
       `SELECT AVG(CASE WHEN player_color = 'white' THEN accuracy_white ELSE accuracy_black END) AS acc
          FROM games
-        WHERE player_id = @player AND analysed_at IS NOT NULL${gameScope}`,
+        WHERE player_id = @player AND analysed_at IS NOT NULL${narrowing}`,
     )
-    .get(params(playerId, scope)) as { acc: number | null };
+    .get(lensParams(playerId, lens)) as { acc: number | null };
   return row.acc === null ? 0 : round1(row.acc);
 }
 
@@ -99,26 +92,26 @@ function playerAccuracy(db: DB, playerId: number, scope: Scope): number {
 function previousWindow(
   db: DB,
   playerId: number,
-  scope: Scope,
+  lens: Lens,
 ): { blundersPerGame: number | null; accuracy: number | null } {
-  const gameScope = scope === 'all' ? '' : ' AND time_class = @scope';
+  const narrowing = lensClause(lens, '');
   const latest = db
     .prepare(
       `SELECT MAX(end_time) AS latest FROM games
-        WHERE player_id = @player AND analysed_at IS NOT NULL${gameScope}`,
+        WHERE player_id = @player AND analysed_at IS NOT NULL${narrowing}`,
     )
-    .get(params(playerId, scope)) as { latest: number | null };
+    .get(lensParams(playerId, lens)) as { latest: number | null };
   if (latest.latest === null) return { blundersPerGame: null, accuracy: null };
 
   const cutoff = latest.latest - 30 * 24 * 3600;
-  const p = { ...params(playerId, scope), cutoff };
+  const p = { ...lensParams(playerId, lens), cutoff };
 
   const row = db
     .prepare(
       `SELECT
          COUNT(DISTINCT g.id) AS games,
          SUM(CASE WHEN m.classification = 'blunder' THEN 1 ELSE 0 END) AS blunders
-       ${PLAYER_MOVES}${scopeClause(scope)} AND g.end_time < @cutoff`,
+       ${PLAYER_MOVES}${lensClause(lens)} AND g.end_time < @cutoff`,
     )
     .get(p) as { games: number; blunders: number | null };
 
@@ -128,7 +121,7 @@ function previousWindow(
     .prepare(
       `SELECT AVG(CASE WHEN player_color = 'white' THEN accuracy_white ELSE accuracy_black END) AS acc
          FROM games
-        WHERE player_id = @player AND analysed_at IS NOT NULL AND end_time < @cutoff${gameScope}`,
+        WHERE player_id = @player AND analysed_at IS NOT NULL AND end_time < @cutoff${narrowing}`,
     )
     .get(p) as { acc: number | null };
 
@@ -138,10 +131,10 @@ function previousWindow(
   };
 }
 
-function medianCentipawnLoss(db: DB, playerId: number, scope: Scope): number {
+function medianCentipawnLoss(db: DB, playerId: number, lens: Lens): number {
   const rows = db
-    .prepare(`SELECT m.cp_loss AS v ${PLAYER_MOVES}${scopeClause(scope)} ORDER BY m.cp_loss`)
-    .all(params(playerId, scope)) as Array<{ v: number }>;
+    .prepare(`SELECT m.cp_loss AS v ${PLAYER_MOVES}${lensClause(lens)} ORDER BY m.cp_loss`)
+    .all(lensParams(playerId, lens)) as Array<{ v: number }>;
   if (rows.length === 0) return 0;
   const mid = Math.floor(rows.length / 2);
   if (rows.length % 2 === 1) return rows[mid]!.v;
@@ -160,8 +153,8 @@ export interface TrendPoint {
 }
 
 /** Newest last, so the chart reads left-to-right in time. */
-export function trend(db: DB, playerId: number, scope: Scope, limit = 30): TrendPoint[] {
-  const gameScope = scope === 'all' ? '' : ' AND g.time_class = @scope';
+export function trend(db: DB, playerId: number, lens: Lens, limit = 30): TrendPoint[] {
+  const narrowing = lensClause(lens);
   const rows = db
     .prepare(
       `SELECT
@@ -171,12 +164,12 @@ export function trend(db: DB, playerId: number, scope: Scope, limit = 30): Trend
          SUM(CASE WHEN m.classification = 'mistake' THEN 1 ELSE 0 END) AS mistakes
        FROM games g
        LEFT JOIN moves m ON m.game_id = g.id AND m.is_player = 1
-      WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${gameScope}
+      WHERE g.player_id = @player AND g.analysed_at IS NOT NULL${narrowing}
       GROUP BY g.id
       ORDER BY g.end_time DESC
       LIMIT @limit`,
     )
-    .all({ ...params(playerId, scope), limit }) as TrendPoint[];
+    .all({ ...lensParams(playerId, lens), limit }) as TrendPoint[];
   return rows.reverse();
 }
 
@@ -192,7 +185,7 @@ export interface PhaseBreakdown {
   rate: number;
 }
 
-export function phaseBreakdown(db: DB, playerId: number, scope: Scope): PhaseBreakdown[] {
+export function phaseBreakdown(db: DB, playerId: number, lens: Lens): PhaseBreakdown[] {
   const rows = db
     .prepare(
       `SELECT
@@ -201,10 +194,10 @@ export function phaseBreakdown(db: DB, playerId: number, scope: Scope): PhaseBre
          SUM(CASE WHEN m.classification = 'inaccuracy' THEN 1 ELSE 0 END) AS inaccuracies,
          SUM(CASE WHEN m.classification = 'mistake' THEN 1 ELSE 0 END) AS mistakes,
          SUM(CASE WHEN m.classification = 'blunder' THEN 1 ELSE 0 END) AS blunders
-       ${PLAYER_MOVES}${scopeClause(scope)}
+       ${PLAYER_MOVES}${lensClause(lens)}
        GROUP BY m.phase`,
     )
-    .all(params(playerId, scope)) as Array<{
+    .all(lensParams(playerId, lens)) as Array<{
     phase: Phase;
     moves: number;
     inaccuracies: number;
@@ -249,8 +242,16 @@ export interface OpeningRow {
   accuracy: number;
 }
 
-export function openings(db: DB, playerId: number, scope: Scope, limit = 12): OpeningRow[] {
-  const gameScope = scope === 'all' ? '' : ' AND time_class = @scope';
+/**
+ * Every opening the player has a real sample of, in this time class.
+ *
+ * This is the menu the opening filter is chosen from, so it deliberately ignores the
+ * lens's own opening: narrowed by the opening it offers, it would list one row and
+ * there would be no way back out.
+ */
+export function openings(db: DB, playerId: number, lens: Lens, limit = 12): OpeningRow[] {
+  const menu = withoutOpening(lens);
+  const narrowing = lensClause(menu, '');
   return db
     .prepare(
       `SELECT
@@ -264,13 +265,13 @@ export function openings(db: DB, playerId: number, scope: Scope, limit = 12): Op
          ROUND(AVG(CASE WHEN player_color = 'white' THEN accuracy_white ELSE accuracy_black END), 1) AS accuracy,
          ROUND(100.0 * SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) / COUNT(*), 1) AS winRate
        FROM games
-      WHERE player_id = @player AND eco IS NOT NULL${gameScope}
+      WHERE player_id = @player AND eco IS NOT NULL${narrowing}
       GROUP BY eco, player_color
       HAVING COUNT(*) >= 2
       ORDER BY games DESC, winRate ASC
       LIMIT @limit`,
     )
-    .all({ ...params(playerId, scope), limit }) as OpeningRow[];
+    .all({ ...lensParams(playerId, menu), limit }) as OpeningRow[];
 }
 
 export interface ClockBucket {
@@ -286,7 +287,7 @@ export interface ClockBucket {
  * The V3 clock-pressure finding. Buckets are seconds remaining when the move was
  * played, so "under 20 seconds" means exactly that rather than "in a fast game".
  */
-export function clockPressure(db: DB, playerId: number, scope: Scope): {
+export function clockPressure(db: DB, playerId: number, lens: Lens): {
   buckets: ClockBucket[];
   coverage: number;
   worstMultiplier: number;
@@ -301,16 +302,16 @@ export function clockPressure(db: DB, playerId: number, scope: Scope): {
          END AS label,
          COUNT(*) AS moves,
          SUM(CASE WHEN m.classification = 'blunder' THEN 1 ELSE 0 END) AS blunders
-       ${PLAYER_MOVES}${scopeClause(scope)} AND m.clock_after IS NOT NULL
+       ${PLAYER_MOVES}${lensClause(lens)} AND m.clock_after IS NOT NULL
        GROUP BY label`,
     )
-    .all(params(playerId, scope)) as Array<{ label: string; moves: number; blunders: number }>;
+    .all(lensParams(playerId, lens)) as Array<{ label: string; moves: number; blunders: number }>;
 
   const totalWithClock = rows.reduce((sum, r) => sum + r.moves, 0);
   const allMoves = (
     db
-      .prepare(`SELECT COUNT(*) AS n ${PLAYER_MOVES}${scopeClause(scope)}`)
-      .get(params(playerId, scope)) as { n: number }
+      .prepare(`SELECT COUNT(*) AS n ${PLAYER_MOVES}${lensClause(lens)}`)
+      .get(lensParams(playerId, lens)) as { n: number }
   ).n;
 
   const order = ['>60s', '60-20s', '<20s'];
@@ -348,10 +349,14 @@ export interface TimeClassSummary {
   winRate: number;
 }
 
-/** Feeds the segmented control: every class shows its own count before selection. */
-export function timeClassSummary(db: DB, playerId: number): TimeClassSummary[] {
+/**
+ * Feeds the segmented control: every class shows its own count before selection.
+ * The counts are taken through the current lens, so with an opening picked the band
+ * reads as "this opening, by time class" rather than reverting to every game.
+ */
+export function timeClassSummary(db: DB, playerId: number, lens: Lens): TimeClassSummary[] {
   return TIME_CLASSES.map((timeClass) => {
-    const head = headline(db, playerId, timeClass);
+    const head = headline(db, playerId, withScope(lens, timeClass));
     return {
       timeClass,
       games: head.games,
@@ -371,31 +376,34 @@ export interface ClassificationCount {
 export function classificationCounts(
   db: DB,
   playerId: number,
-  scope: Scope,
+  lens: Lens,
 ): ClassificationCount[] {
   return db
     .prepare(
       `SELECT m.classification, COUNT(*) AS count
-       ${PLAYER_MOVES}${scopeClause(scope)}
+       ${PLAYER_MOVES}${lensClause(lens)}
        GROUP BY m.classification
        ORDER BY count DESC`,
     )
-    .all(params(playerId, scope)) as ClassificationCount[];
+    .all(lensParams(playerId, lens)) as ClassificationCount[];
 }
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-export function dashboard(db: DB, playerId: number, scope: Scope) {
+export function dashboard(db: DB, playerId: number, lens: Lens) {
   return {
-    scope,
-    headline: headline(db, playerId, scope),
-    timeClasses: timeClassSummary(db, playerId),
-    trend: trend(db, playerId, scope),
-    phases: phaseBreakdown(db, playerId, scope),
-    openings: openings(db, playerId, scope),
-    clock: clockPressure(db, playerId, scope),
-    classifications: classificationCounts(db, playerId, scope),
+    // Both, because `scope` is what the screens have always read and `lens` is what
+    // the numbers were actually computed under.
+    scope: lens.scope,
+    lens,
+    headline: headline(db, playerId, lens),
+    timeClasses: timeClassSummary(db, playerId, lens),
+    trend: trend(db, playerId, lens),
+    phases: phaseBreakdown(db, playerId, lens),
+    openings: openings(db, playerId, lens),
+    clock: clockPressure(db, playerId, lens),
+    classifications: classificationCounts(db, playerId, lens),
   };
 }

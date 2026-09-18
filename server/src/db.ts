@@ -114,11 +114,11 @@ export function migrate(db: DB): void {
     CREATE TABLE IF NOT EXISTS coaching (
       id         INTEGER PRIMARY KEY,
       player_id  INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-      scope      TEXT NOT NULL,
+      lens       TEXT NOT NULL,
       body       TEXT NOT NULL,
       model      TEXT NOT NULL,
       created_at INTEGER NOT NULL,
-      UNIQUE (player_id, scope)
+      UNIQUE (player_id, lens)
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -126,6 +126,16 @@ export function migrate(db: DB): void {
       value TEXT NOT NULL
     );
   `);
+
+  // Coaching used to be cached per time class; it is now cached per lens, which is a
+  // time class and optionally an opening. Every existing row is already a valid lens
+  // key — an unfiltered lens keys as its bare scope — so this only renames the column.
+  const coachingColumns = db.prepare('PRAGMA table_info(coaching)').all() as Array<{
+    name: string;
+  }>;
+  if (coachingColumns.some((column) => column.name === 'scope')) {
+    db.exec('ALTER TABLE coaching RENAME COLUMN scope TO lens');
+  }
 }
 
 export function getSetting(db: DB, key: string, fallback: string): string {

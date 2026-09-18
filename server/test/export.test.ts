@@ -4,8 +4,13 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { test, describe } from 'node:test';
-import { inlineIntoHtml } from '../src/export.js';
-import type { Snapshot } from '../../web/src/types.js';
+import Database from 'better-sqlite3';
+import { buildSnapshot, inlineIntoHtml } from '../src/export.js';
+import { migrate, type DB } from '../src/db.js';
+import { openings } from '../src/stats.js';
+import { lensKey, SNAPSHOT_VERSION, type Scope, type Snapshot } from '../../web/src/types.js';
+
+const SCOPES: Scope[] = ['all', 'bullet', 'blitz', 'rapid', 'daily'];
 
 const TEMPLATE = `<!doctype html><html><head>
 <link rel="stylesheet" crossorigin href="/assets/app.css">
@@ -23,7 +28,7 @@ function fixtureDist(bundle: string): string {
 
 function fixtureSnapshot(): Snapshot {
   return {
-    version: 1,
+    version: SNAPSHOT_VERSION,
     generatedAt: 1_700_000_000,
     engine: 'Stockfish 16',
     analysisDepth: 16,
@@ -37,7 +42,7 @@ function fixtureSnapshot(): Snapshot {
     },
     games: [],
     moves: {},
-    scopes: {} as Snapshot['scopes'],
+    lenses: {},
   };
 }
 
@@ -86,5 +91,86 @@ describe('snapshot inlining', () => {
     assert.ok(!hasPlainBlock(lean), 'lean export carried the uncompressed copy');
     assert.ok(hasPlainBlock(fat), '--with-fallback did not add the uncompressed copy');
     assert.ok(fat.length > lean.length);
+  });
+});
+
+
+/** A player whose openings do not line up neatly across the time classes, which is
+ *  where the exporter's completeness rule earns its keep. */
+function seededDb(): DB {
+  const db = new Database(':memory:');
+  migrate(db);
+  db.prepare(
+    `INSERT INTO players (id, username, source, created_at) VALUES (1, 'tester', 'test', 0)`,
+  ).run();
+
+  const rows: Array<[string, string, string]> = [
+    // eco, colour, time class — the Berlin is mostly rapid, the Sicilian mostly blitz.
+    ['C65', 'white', 'rapid'],
+    ['C65', 'white', 'rapid'],
+    ['C65', 'white', 'rapid'],
+    ['C65', 'white', 'blitz'],
+    ['B20', 'black', 'blitz'],
+    ['B20', 'black', 'blitz'],
+    ['B20', 'black', 'bullet'],
+    ['A04', 'white', 'daily'],
+    ['A04', 'white', 'daily'],
+  ];
+
+  rows.forEach(([eco, color, timeClass], index) => {
+    db.prepare(
+      `INSERT INTO games (id, player_id, external_id, source, pgn, time_class, time_control,
+                          end_time, white_username, black_username, eco, eco_name, player_color,
+                          result, opponent, move_count, accuracy_white, accuracy_black,
+                          analysed_at, created_at)
+       VALUES (@id, 1, @ext, 'test', '', @timeClass, '600+0', @endTime, 'tester', 'other',
+               @eco, @eco, @color, 'win', 'other', 10, 80, 80, 1, 0)`,
+    ).run({
+      id: index + 1,
+      ext: `g${index + 1}`,
+      timeClass,
+      endTime: 1_000_000 + index,
+      eco,
+      color,
+    });
+  });
+  return db;
+}
+
+describe('which lenses a snapshot carries', () => {
+  test('every opening the reader can offer exists in every time class', async () => {
+    // An opening picked under one time class stays picked when you switch to
+    // another. If that combination was never written, the phone shows a screen with
+    // no numbers and no way back — so the exporter writes the product, not the
+    // diagonal, and this is the assertion that keeps it doing so.
+    const db = seededDb();
+    const snapshot = await buildSnapshot(db, 'tester');
+
+    const menu = new Set<string>();
+    for (const scope of SCOPES) {
+      for (const row of openings(db, 1, { scope })) menu.add(`${row.eco}:${row.color}`);
+    }
+    assert.ok(menu.size >= 3, 'fixture should offer several openings');
+
+    const missing: string[] = [];
+    for (const scope of SCOPES) {
+      if (!snapshot.lenses[scope]) missing.push(scope);
+      for (const entry of menu) {
+        const [eco, color] = entry.split(':');
+        const key = lensKey({ scope, eco, color: color as 'white' | 'black' });
+        if (!snapshot.lenses[key]) missing.push(key);
+      }
+    }
+    assert.deepEqual(missing, []);
+    db.close();
+  });
+
+  test('an unfiltered lens is still keyed by its bare time class', async () => {
+    // Which is what makes a snapshot readable by a client that knows only scopes.
+    const db = seededDb();
+    const snapshot = await buildSnapshot(db, 'tester');
+    for (const scope of SCOPES) assert.ok(snapshot.lenses[scope], `no ${scope} lens`);
+    assert.equal(snapshot.lenses.all!.dashboard.lens.eco, undefined);
+    db.close();
   });
 });

@@ -2,11 +2,22 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { BaselineBars } from '../components/BaselineBars';
-import { Empty, ErrorNote, Loading, TimeClassBand } from '../components/Chrome';
+import {
+  Empty,
+  ErrorNote,
+  Loading,
+  OpeningBand,
+  TimeClassBand,
+  lensOpeningLabel,
+  openingKey,
+} from '../components/Chrome';
 import { pluralise, relativeTime, scopeLabel, signed } from '../format';
+import { lensKey } from '../types';
 import type {
   Coaching,
   Dashboard as DashboardData,
+  Lens,
+  OpeningRow,
   Pattern,
   Profile,
   Scope,
@@ -15,13 +26,15 @@ import type {
 
 export function Dashboard({
   username,
-  scope,
+  lens,
   onScopeChange,
+  onLensChange,
   engine,
 }: {
   username: string | null;
-  scope: Scope;
+  lens: Lens;
   onScopeChange: (scope: Scope) => void;
+  onLensChange: (lens: Lens) => void;
   engine?: string;
 }) {
   const navigate = useNavigate();
@@ -39,9 +52,9 @@ export function Dashboard({
     setError(null);
 
     Promise.all([
-      api.dashboard(username, scope),
-      api.patterns(username, scope),
-      api.profile(username, scope).catch(() => null),
+      api.dashboard(username, lens),
+      api.patterns(username, lens),
+      api.profile(username, lens).catch(() => null),
     ])
       .then(([dashboard, patternResponse, profileResponse]) => {
         if (cancelled) return;
@@ -59,7 +72,9 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [username, scope]);
+    // The lens is an object rebuilt on every render, so the key is the dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, lensKey(lens)]);
 
   // Coaching is a separate request because it can be slow and the numbers should
   // never wait on it.
@@ -68,7 +83,7 @@ export function Dashboard({
     let cancelled = false;
     setCoaching(null);
     api
-      .coaching(username, scope)
+      .coaching(username, lens)
       .then((response) => {
         if (!cancelled) setCoaching(response.coaching);
       })
@@ -78,7 +93,8 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [username, scope]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, lensKey(lens)]);
 
   if (!username) {
     return (
@@ -99,20 +115,24 @@ export function Dashboard({
     return (
       <>
         <TimeClassBand
-          scope={scope}
+          scope={lens.scope}
           onChange={onScopeChange}
           summaries={data.timeClasses}
           totalGames={data.timeClasses.reduce((sum, t) => sum + t.games, 0)}
         />
+        <OpeningBand lens={lens} openings={data.openings} onChange={onLensChange} />
         <Empty title="Nothing analysed in this segment yet.">
-          {headline.games > 0
-            ? `${pluralise(headline.games, 'game')} imported but not analysed. Start the analysis from Settings, or pick another time class.`
-            : 'No games in this time class. Try another segment, or import more games.'}
+          {lens.eco
+            ? 'No analysed games in that opening. Clear the opening filter, or pick another one.'
+            : headline.games > 0
+              ? `${pluralise(headline.games, 'game')} imported but not analysed. Start the analysis from Settings, or pick another time class.`
+              : 'No games in this time class. Try another segment, or import more games.'}
         </Empty>
       </>
     );
   }
 
+  const openingNote = lensOpeningLabel(lens, data.openings);
   const worstPhase = [...phases].sort((a, b) => b.share - a.share)[0];
   const scramble = clock.buckets.find((bucket) => bucket.label === '<20s');
   const hasClockData = clock.buckets.some((bucket) => bucket.moves > 0);
@@ -130,7 +150,9 @@ export function Dashboard({
           You keep losing
           <br />
           the same <em>{patterns.length || headline.analysedGames}</em>{' '}
-          {patterns.length ? 'ways.' : 'games.'}
+          {/* One leak is a way, not "1 ways" — and narrowing to one opening lands on
+              a single pattern often enough that the plural cannot be assumed. */}
+          {patterns.length === 1 ? 'way.' : patterns.length ? 'ways.' : 'games.'}
         </h1>
         <div className="headline-aside">
           {pluralise(headline.analysedGames, 'game')} analysed
@@ -139,15 +161,22 @@ export function Dashboard({
           {headline.winRate.toFixed(0)}% wins
           <br />
           {engine ? `${engine} · ` : ''}synced {relativeTime(data.player.last_synced_at)}
+          {openingNote ? (
+            <>
+              <br />
+              <span className="opening-note">{openingNote}</span>
+            </>
+          ) : null}
         </div>
       </div>
 
       <TimeClassBand
-        scope={scope}
+        scope={lens.scope}
         onChange={onScopeChange}
         summaries={data.timeClasses}
         totalGames={data.timeClasses.reduce((sum, t) => sum + t.games, 0)}
       />
+      <OpeningBand lens={lens} openings={data.openings} onChange={onLensChange} />
 
       <div className="stat-row">
         <div className="stat stat-blunders">
@@ -224,7 +253,10 @@ export function Dashboard({
           <div className="label">
             accuracy, last {trend.length} games — bars below the rule are blunder games
           </div>
-          <div className="meta">{scopeLabel(scope)}</div>
+          <div className="meta">
+            {scopeLabel(lens.scope)}
+            {openingNote ? ` · ${openingNote}` : ''}
+          </div>
         </div>
         <BaselineBars trend={trend} onSelect={(point) => navigate(`/review/${point.gameId}`)} />
       </div>
@@ -344,8 +376,89 @@ export function Dashboard({
         </aside>
       </div>
 
+      <Openings rows={data.openings} lens={lens} onPick={onLensChange} />
+
       <ScoutingReport profile={profile} />
     </>
+  );
+}
+
+/**
+ * The openings themselves, and the way into every other number on this page.
+ *
+ * These were always computed and never shown. As a table they answer "which of my
+ * openings is costing me", and as a row of buttons they answer the follow-up: pick
+ * one and the whole sheet — patterns, phases, clock, scouting report — is recomputed
+ * inside it.
+ */
+function Openings({
+  rows,
+  lens,
+  onPick,
+}: {
+  rows: OpeningRow[];
+  lens: Lens;
+  onPick: (lens: Lens) => void;
+}) {
+  if (rows.length === 0) return null;
+  const active = lens.eco ? `${lens.eco}:${lens.color ?? ''}` : '';
+
+  return (
+    <div className="openings">
+      <div className="section-head">
+        <div className="label">openings · click one to read the sheet inside it</div>
+        <div className="meta">two games minimum</div>
+      </div>
+
+      <div className="rows">
+        <div className="row-head label opening-row">
+          <span>eco</span>
+          <span>opening</span>
+          <span>as</span>
+          <span style={{ textAlign: 'right' }}>games</span>
+          <span style={{ textAlign: 'right' }}>w · l · d</span>
+          <span style={{ textAlign: 'right' }}>wins</span>
+          <span style={{ textAlign: 'right' }}>accuracy</span>
+        </div>
+        {rows.map((row) => {
+          const isActive = openingKey(row) === active;
+          return (
+            <button
+              key={openingKey(row)}
+              type="button"
+              className={`row opening-row${isActive ? ' is-active' : ''}`}
+              aria-pressed={isActive}
+              onClick={() =>
+                onPick(
+                  isActive
+                    ? { scope: lens.scope }
+                    : { scope: lens.scope, eco: row.eco, color: row.color as 'white' | 'black' },
+                )
+              }
+            >
+              <span className="meta numeric">{row.eco}</span>
+              <span style={{ font: '600 15px/1.2 var(--display)' }}>{row.name}</span>
+              <span className="meta">{row.color}</span>
+              <span className="numeric" style={{ textAlign: 'right' }}>
+                {row.games}
+              </span>
+              <span className="meta numeric" style={{ textAlign: 'right' }}>
+                {row.wins} · {row.losses} · {row.draws}
+              </span>
+              <span
+                className="numeric"
+                style={{ textAlign: 'right', font: '600 17px/1 var(--display)' }}
+              >
+                {row.winRate.toFixed(0)}%
+              </span>
+              <span className="numeric meta" style={{ textAlign: 'right' }}>
+                {row.accuracy === null ? '—' : row.accuracy.toFixed(1)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

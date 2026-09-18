@@ -1,7 +1,7 @@
 import type { DB } from './db.js';
 import { round1 } from './evaluation.js';
 import { MOTIF_LABELS } from './motifs.js';
-import type { Scope } from './stats.js';
+import { lensClause, lensParams, type Lens } from './lens.js';
 import type { Phase, TimeClass } from './types.js';
 
 /**
@@ -160,11 +160,11 @@ const SUGGESTIONS: Record<string, string> = {
 export function detectPatterns(
   db: DB,
   playerId: number,
-  scope: Scope,
+  lens: Lens,
   options: { minOccurrences?: number; limit?: number } = {},
 ): Pattern[] {
   const minOccurrences = options.minOccurrences ?? 3;
-  const scopeClause = scope === 'all' ? '' : ' AND g.time_class = @scope';
+  const narrowing = lensClause(lens);
 
   const rows = db
     .prepare(
@@ -178,10 +178,10 @@ export function detectPatterns(
         AND m.is_player = 1
         AND g.analysed_at IS NOT NULL
         AND m.motifs <> ''
-        AND m.classification IN ('inaccuracy','mistake','blunder')${scopeClause}
+        AND m.classification IN ('inaccuracy','mistake','blunder')${narrowing}
       ORDER BY m.win_percent_loss DESC`,
     )
-    .all({ player: playerId, scope: scope === 'all' ? null : scope }) as MistakeRow[];
+    .all(lensParams(playerId, lens)) as MistakeRow[];
 
   const groups = new Map<string, MistakeRow[]>();
   for (const row of rows) {

@@ -80,7 +80,7 @@ describe('scouting report', () => {
     const db = freshDb();
     for (let i = 0; i < 5; i += 1) addGame(db, { result: 'win' });
 
-    const report = profile(db, 1, 'all');
+    const report = profile(db, 1, { scope: 'all' });
     // Five games describe five games. Refusing to profile is the correct answer.
     assert.equal(report.thin, true);
     assert.deepEqual(report.strengths, []);
@@ -94,7 +94,7 @@ describe('scouting report', () => {
       addGame(db, { result: 'win', phase: 'endgame', mine: 95, theirs: 80 });
     }
 
-    const report = profile(db, 1, 'all');
+    const report = profile(db, 1, { scope: 'all' });
     const trait = report.strengths.find((t) => t.key === 'phase-endgame');
     assert.ok(trait, 'expected an endgame strength');
     assert.match(trait.title, /endgame/);
@@ -114,7 +114,7 @@ describe('scouting report', () => {
       addGame(db, { result: 'loss', phase: 'opening', mine: 78, theirs: 92 });
     }
 
-    const report = profile(db, 1, 'all');
+    const report = profile(db, 1, { scope: 'all' });
     assert.ok(report.weaknesses.some((t) => t.key === 'phase-opening'));
     db.close();
   });
@@ -125,7 +125,7 @@ describe('scouting report', () => {
       addGame(db, { result: 'draw', phase: 'middlegame', mine: 90, theirs: 89 });
     }
 
-    const report = profile(db, 1, 'all');
+    const report = profile(db, 1, { scope: 'all' });
     assert.equal(
       [...report.strengths, ...report.weaknesses].some((t) => t.key.startsWith('phase-')),
       false,
@@ -141,7 +141,7 @@ describe('scouting report', () => {
       addGame(db, { result: i < 2 ? 'win' : 'loss', best: 300 });
     }
 
-    const report = profile(db, 1, 'all');
+    const report = profile(db, 1, { scope: 'all' });
     const trait = report.weaknesses.find((t) => t.key === 'conversion');
     assert.ok(trait, 'expected a conversion weakness');
     assert.match(trait.evidence, /2 of 10/);
@@ -152,7 +152,7 @@ describe('scouting report', () => {
     const db = freshDb();
     for (let i = 0; i < 10; i += 1) addGame(db, { result: 'win', best: 300 });
 
-    const report = profile(db, 1, 'all');
+    const report = profile(db, 1, { scope: 'all' });
     assert.ok(report.strengths.some((t) => t.key === 'conversion'));
     db.close();
   });
@@ -162,7 +162,7 @@ describe('scouting report', () => {
     for (let i = 0; i < 5; i += 1) addGame(db, { result: 'win', eco: 'C65' });
     for (let i = 0; i < 5; i += 1) addGame(db, { result: 'loss', eco: 'A04' });
 
-    const report = profile(db, 1, 'all');
+    const report = profile(db, 1, { scope: 'all' });
     assert.ok(report.strengths.some((t) => t.key === 'opening-C65'));
     assert.ok(report.weaknesses.some((t) => t.key === 'opening-A04'));
     db.close();
@@ -173,7 +173,7 @@ describe('scouting report', () => {
     for (let i = 0; i < 3; i += 1) addGame(db, { result: 'win', eco: 'B10' });
     for (let i = 0; i < 7; i += 1) addGame(db, { result: 'draw' });
 
-    const report = profile(db, 1, 'all');
+    const report = profile(db, 1, { scope: 'all' });
     assert.equal(
       [...report.strengths, ...report.weaknesses].some((t) => t.key === 'opening-B10'),
       false,
@@ -187,7 +187,7 @@ describe('scouting report', () => {
       addGame(db, { result: 'win', eco: 'C65', best: 300, mine: 96, theirs: 78 });
     }
 
-    const report = profile(db, 1, 'all');
+    const report = profile(db, 1, { scope: 'all' });
     const all = [...report.strengths, ...report.weaknesses];
     assert.ok(all.length > 0);
     for (const trait of all) {
@@ -207,8 +207,8 @@ describe('scouting report', () => {
       addGame(db, { result: 'win', timeClass: 'rapid', phase: 'opening', mine: 95, theirs: 80 });
     }
 
-    const bullet = profile(db, 1, 'bullet');
-    const rapid = profile(db, 1, 'rapid');
+    const bullet = profile(db, 1, { scope: 'bullet' });
+    const rapid = profile(db, 1, { scope: 'rapid' });
     assert.ok(bullet.weaknesses.some((t) => t.key === 'phase-opening'));
     assert.ok(rapid.strengths.some((t) => t.key === 'phase-opening'));
     db.close();

@@ -32,6 +32,12 @@ class, with a plain-language coaching layer on top.
 - Time-class segmentation (all / bullet / blitz / rapid / daily) filtering every stat
 - Mistake breakdown by phase (opening / middlegame / endgame)
 - Win rate by opening, from the ECO codes in the PGN
+- **Filter the whole sheet by opening** — pick one from the openings table, or from
+  the band under the time-class rule, and every number on every screen is recomputed
+  inside it: the patterns, the phases, the clock, the scouting report, the game list.
+  Openings are held per side, because the Berlin as White and the Berlin as Black are
+  different problems. The two lenses compose, so "my Sicilian in blitz" is a question
+  you can ask.
 
 **V3 — pattern detection and coaching**
 
@@ -84,7 +90,12 @@ A snapshot is read-only by construction — importing and analysis need the engi
 masthead says when it was taken, so a month-old sheet is never mistaken for today's form.
 To update it, export again.
 
-Two flags, both rarely needed: `--coaching` asks Claude for any scope that has not got
+The opening filter works offline too: the export writes one frozen sheet per time class
+*and* per opening, so the phone can narrow the numbers without an engine behind it.
+Settings says how many openings a file carries. That costs about 7% more — the moves are
+the bulk of a snapshot and they are shared.
+
+Two flags, both rarely needed: `--coaching` asks Claude for any lens that has not got
 coaching cached yet, and `--with-fallback` adds an uncompressed copy of the payload for
 browsers without `DecompressionStream`, which roughly quadruples the file.
 
@@ -186,14 +197,15 @@ server/
   motifs.ts      Why a move lost value — the vocabulary patterns cluster on
   patterns.ts    Mistake clustering and rating cost
   profile.ts     Strengths and weaknesses — the scouting report
-  stats.ts       Dashboard aggregation, segmented by time class
+  lens.ts        What a report is narrowed to: a time class, and maybe an opening
+  stats.ts       Dashboard aggregation, through a lens
   coach.ts       Claude coaching layer, with an offline fallback
   chesscom.ts    Public API client
   seed.ts        Offline demo-history generator
   export.ts      Freezes a player into a portable snapshot
 web/
   screens/       Dashboard, Library, Review, Patterns, Import, Settings
-  components/    Board, baseline bars, time-class band, masthead
+  components/    Board, baseline bars, time-class and opening bands, masthead
   snapshot.ts    Serves the read endpoints when there is no server
   styles.css     The design system
   public/fonts/  Self-hosted typefaces, so an export needs no network
@@ -206,7 +218,7 @@ npm test
 ```
 
 Covers the scoring model, PGN and clock parsing, time-class inference, motif detection,
-the aggregation layer and snapshot inlining. The analysis tests run a real engine against fixture games —
+the aggregation layer, the opening lens and snapshot inlining. The analysis tests run a real engine against fixture games —
 including checking that the app calls Morphy's 13.Rxd7 in the Opera Game brilliant.
 
 ---

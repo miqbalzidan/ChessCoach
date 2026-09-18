@@ -261,6 +261,10 @@ export function unanalysedGames(db: DB, playerId: number, limit: number): GameRo
 export interface GameFilter {
   timeClass?: TimeClass | 'all';
   result?: GameResult | 'all';
+  /** ECO code, so the library can be narrowed to the same opening as the sheet. */
+  eco?: string;
+  /** Which side the player had, meaningful only alongside an eco. */
+  color?: 'white' | 'black';
   opponent?: string;
   from?: number;
   to?: number;
@@ -283,6 +287,15 @@ export function buildGameWhere(playerId: number, filter: GameFilter): {
   if (filter.result && filter.result !== 'all') {
     clauses.push('result = ?');
     params.push(filter.result);
+  }
+  if (filter.eco) {
+    clauses.push('eco = ?');
+    params.push(filter.eco);
+    // Colour narrows an opening; on its own it would be a different filter entirely.
+    if (filter.color) {
+      clauses.push('player_color = ?');
+      params.push(filter.color);
+    }
   }
   if (filter.opponent) {
     clauses.push('opponent LIKE ?');

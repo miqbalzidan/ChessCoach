@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { DB } from './db.js';
 import type { Pattern } from './patterns.js';
-import type { Scope } from './stats.js';
+import { lensKey, lensLabel, type Lens } from './lens.js';
 import type { dashboard } from './stats.js';
 
 const MODEL = process.env.COACH_MODEL ?? 'claude-opus-5';
@@ -45,7 +45,7 @@ supports it. Prefer advice the player can act on this week.`;
 
 export interface CoachingInput {
   username: string;
-  scope: Scope;
+  lens: Lens;
   stats: ReturnType<typeof dashboard>;
   patterns: Pattern[];
 }
@@ -60,12 +60,12 @@ export function hasApiKey(): boolean {
  * renders from.
  */
 export function buildBrief(input: CoachingInput): string {
-  const { stats, patterns, scope } = input;
+  const { stats, patterns, lens } = input;
   const head = stats.headline;
   const lines: string[] = [];
 
   lines.push(`Player: ${input.username}`);
-  lines.push(`Segment: ${scope === 'all' ? 'all time controls' : scope}`);
+  lines.push(`Segment: ${lensLabel(lens)}`);
   lines.push(
     `Sample: ${head.analysedGames} analysed games (${head.record.win}W/${head.record.loss}L/${head.record.draw}D, ${head.winRate}% win rate), ${head.moves} of their own moves.`,
   );
@@ -104,7 +104,7 @@ export function buildBrief(input: CoachingInput): string {
     }
   }
 
-  const weakOpenings = stats.openings.filter((o) => o.games >= 3).slice(0, 5);
+  const weakOpenings = lens.eco ? [] : stats.openings.filter((o) => o.games >= 3).slice(0, 5);
   if (weakOpenings.length > 0) {
     lines.push('');
     lines.push('Most played openings (ECO, as which colour, win rate):');
@@ -254,10 +254,10 @@ function now(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-export function readCachedCoaching(db: DB, playerId: number, scope: Scope): Coaching | null {
+export function readCachedCoaching(db: DB, playerId: number, lens: Lens): Coaching | null {
   const row = db
-    .prepare('SELECT body, model, created_at FROM coaching WHERE player_id = ? AND scope = ?')
-    .get(playerId, scope) as { body: string; model: string; created_at: number } | undefined;
+    .prepare('SELECT body, model, created_at FROM coaching WHERE player_id = ? AND lens = ?')
+    .get(playerId, lensKey(lens)) as { body: string; model: string; created_at: number } | undefined;
   if (!row) return null;
   try {
     return { ...JSON.parse(row.body), model: row.model, generatedAt: row.created_at };
@@ -269,17 +269,17 @@ export function readCachedCoaching(db: DB, playerId: number, scope: Scope): Coac
 export function writeCachedCoaching(
   db: DB,
   playerId: number,
-  scope: Scope,
+  lens: Lens,
   coaching: Coaching,
 ): void {
   db.prepare(
-    `INSERT INTO coaching (player_id, scope, body, model, created_at)
+    `INSERT INTO coaching (player_id, lens, body, model, created_at)
      VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT (player_id, scope) DO UPDATE SET
+     ON CONFLICT (player_id, lens) DO UPDATE SET
        body = excluded.body, model = excluded.model, created_at = excluded.created_at`,
   ).run(
     playerId,
-    scope,
+    lensKey(lens),
     JSON.stringify({
       headline: coaching.headline,
       diagnosis: coaching.diagnosis,

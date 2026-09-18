@@ -49,8 +49,12 @@ export function SnapshotSettings() {
         <dd>
           {snapshot.engine} · depth {snapshot.analysisDepth}
         </dd>
+        <dt>openings</dt>
+        {/* A snapshot can only be read through a lens it was written with, so saying
+            how many it carries is saying what this file can be asked. */}
+        <dd>{pluralise(openingCount(snapshot), 'opening')} filterable</dd>
         <dt>coaching</dt>
-        <dd>{describeCoaching(snapshot.scopes.all.coaching?.model)}</dd>
+        <dd>{describeCoaching(snapshot.lenses.all?.coaching?.model)}</dd>
       </dl>
 
       <div className="section-head" style={{ marginTop: 36 }}>
@@ -97,6 +101,11 @@ export function SnapshotSettings() {
       )}
     </>
   );
+}
+
+/** Lens keys carry a colon only when they name an opening. */
+function openingCount(snapshot: { lenses: Record<string, unknown> }): number {
+  return Object.keys(snapshot.lenses).filter((key) => key.includes(':')).length;
 }
 
 /** The offline summariser records itself as "offline", which reads as a mistake

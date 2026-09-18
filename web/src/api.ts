@@ -4,7 +4,9 @@ import type {
   Game,
   GameResult,
   Job,
+  Lens,
   Move,
+  OpeningRow,
   Pattern,
   Player,
   Profile,
@@ -61,6 +63,16 @@ function post<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, { method: 'POST', body: JSON.stringify(body) });
 }
 
+/** The lens as the read endpoints take it. Colour only travels with an opening. */
+function lensQuery(lens: Lens, extra: Record<string, string> = {}): string {
+  const query = new URLSearchParams({ scope: lens.scope, ...extra });
+  if (lens.eco) {
+    query.set('eco', lens.eco);
+    if (lens.color) query.set('color', lens.color);
+  }
+  return query.toString();
+}
+
 export const api = {
   health: () =>
     request<{ ok: boolean; engine: string; engines: number; coaching: string; defaultDepth: number }>(
@@ -96,6 +108,8 @@ export const api = {
     params: {
       timeClass?: Scope;
       result?: GameResult | 'all';
+      eco?: string;
+      color?: 'white' | 'black';
       opponent?: string;
       limit?: number;
       offset?: number;
@@ -115,22 +129,28 @@ export const api = {
 
   analyseGame: (id: number) => post<{ game: Game; moves: Move[] }>(`/games/${id}/analyse`, {}),
 
-  dashboard: (username: string, scope: Scope) =>
-    request<Dashboard>(`/players/${encodeURIComponent(username)}/dashboard?scope=${scope}`),
+  dashboard: (username: string, lens: Lens) =>
+    request<Dashboard>(`/players/${encodeURIComponent(username)}/dashboard?${lensQuery(lens)}`),
 
-  profile: (username: string, scope: Scope) =>
-    request<{ scope: Scope; profile: Profile }>(
-      `/players/${encodeURIComponent(username)}/profile?scope=${scope}`,
+  profile: (username: string, lens: Lens) =>
+    request<{ scope: Scope; lens: Lens; profile: Profile }>(
+      `/players/${encodeURIComponent(username)}/profile?${lensQuery(lens)}`,
     ),
 
-  patterns: (username: string, scope: Scope, min = 3) =>
-    request<{ scope: Scope; patterns: Pattern[]; labels: Record<string, string> }>(
-      `/players/${encodeURIComponent(username)}/patterns?scope=${scope}&min=${min}`,
+  /** The openings this player has a real sample of, for the filter to offer. */
+  openings: (username: string, scope: Scope) =>
+    request<{ scope: Scope; openings: OpeningRow[] }>(
+      `/players/${encodeURIComponent(username)}/openings?scope=${scope}`,
     ),
 
-  coaching: (username: string, scope: Scope, refresh = false) =>
-    request<{ scope: Scope; coaching: Coaching; cached: boolean }>(
-      `/players/${encodeURIComponent(username)}/coaching?scope=${scope}&refresh=${refresh}`,
+  patterns: (username: string, lens: Lens, min = 3) =>
+    request<{ scope: Scope; lens: Lens; patterns: Pattern[]; labels: Record<string, string> }>(
+      `/players/${encodeURIComponent(username)}/patterns?${lensQuery(lens, { min: String(min) })}`,
+    ),
+
+  coaching: (username: string, lens: Lens, refresh = false) =>
+    request<{ scope: Scope; lens: Lens; coaching: Coaching; cached: boolean }>(
+      `/players/${encodeURIComponent(username)}/coaching?${lensQuery(lens, { refresh: String(refresh) })}`,
     ),
 
   settings: () => request<Settings>('/settings'),

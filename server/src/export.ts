@@ -13,11 +13,11 @@
 import { gzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type { Scope, Snapshot, SnapshotScope } from '../../web/src/types.js';
-import { SNAPSHOT_VERSION } from '../../web/src/types.js';
+import type { Lens, Scope, Snapshot, SnapshotScope } from '../../web/src/types.js';
+import { lensKey, SNAPSHOT_VERSION } from '../../web/src/types.js';
 import { getDb, getSetting, type DB } from './db.js';
 import { findPlayer, getMoves, listGames } from './store.js';
-import { dashboard } from './stats.js';
+import { dashboard, openings } from './stats.js';
 import { detectPatterns } from './patterns.js';
 import { profile } from './profile.js';
 import { MOTIF_LABELS } from './motifs.js';
@@ -58,28 +58,31 @@ export async function buildSnapshot(
   }
   note(`${Object.values(moves).reduce((sum, list) => sum + list.length, 0)} moves`);
 
-  const scopes = {} as Record<Scope, SnapshotScope>;
-  for (const scope of SCOPES) {
-    const stats = dashboard(db, player.id, scope);
-    const patterns = detectPatterns(db, player.id, scope, { minOccurrences: MIN_OCCURRENCES });
+  // The phone can compute nothing, so a lens that is not exported cannot be looked
+  // through. Every lens the picker can reach is written: each time class, and each
+  // opening that time class offers as a menu entry.
+  const lenses: Record<string, SnapshotScope> = {};
+  for (const lens of lensesToExport(db, player.id)) {
+    const stats = dashboard(db, player.id, lens);
+    const patterns = detectPatterns(db, player.id, lens, { minOccurrences: MIN_OCCURRENCES });
 
-    let coaching = readCachedCoaching(db, player.id, scope);
+    let coaching = readCachedCoaching(db, player.id, lens);
     if (!coaching && options.generateMissingCoaching && stats.headline.analysedGames > 0) {
-      note(`coaching for ${scope}…`);
-      coaching = await generateCoaching({ username: player.username, scope, stats, patterns });
-      writeCachedCoaching(db, player.id, scope, coaching);
+      note(`coaching for ${lensKey(lens)}…`);
+      coaching = await generateCoaching({ username: player.username, lens, stats, patterns });
+      writeCachedCoaching(db, player.id, lens, coaching);
     }
 
     // The dashboard endpoint answers with the player spread in alongside the stats,
     // so the snapshot has to carry the same shape or the screens read undefined.
-    scopes[scope] = {
+    lenses[lensKey(lens)] = {
       dashboard: { player, ...stats } as SnapshotScope['dashboard'],
       patterns: patterns as SnapshotScope['patterns'],
       labels: MOTIF_LABELS,
       coaching: coaching as SnapshotScope['coaching'],
-      profile: profile(db, player.id, scope) as SnapshotScope['profile'],
+      profile: profile(db, player.id, lens) as SnapshotScope['profile'],
     };
-    note(`${scope}: ${patterns.length} patterns`);
+    note(`${lensKey(lens)}: ${patterns.length} patterns`);
   }
 
   return {
@@ -91,8 +94,38 @@ export async function buildSnapshot(
     player,
     games: games.map(stripPgn),
     moves,
-    scopes,
+    lenses,
   } as Snapshot;
+}
+
+/**
+ * Every lens the reader can be asked for.
+ *
+ * Not just the openings each time class offers: an opening picked under one time
+ * class stays picked when you move to another, so the set has to be the product of
+ * the two, not the diagonal. A lens the file lacks is a screen with no numbers and
+ * no way back, so completeness here is what keeps that unreachable — the reader
+ * offers only what is written, and this writes everything that can be offered.
+ *
+ * It stays small because the menu already demands a real sample: the union across
+ * the five time classes is a dozen or so openings, and an empty combination costs a
+ * few hundred bytes.
+ */
+function lensesToExport(db: DB, playerId: number): Lens[] {
+  const menu = new Map<string, { eco: string; color: 'white' | 'black' }>();
+  for (const scope of SCOPES) {
+    for (const opening of openings(db, playerId, { scope })) {
+      const entry = { eco: opening.eco, color: opening.color as 'white' | 'black' };
+      menu.set(`${entry.eco}:${entry.color}`, entry);
+    }
+  }
+
+  const list: Lens[] = [];
+  for (const scope of SCOPES) {
+    list.push({ scope });
+    for (const entry of menu.values()) list.push({ scope, ...entry });
+  }
+  return list;
 }
 
 /** The engine that actually produced the numbers, taken from the games rather than

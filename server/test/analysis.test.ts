@@ -173,22 +173,22 @@ describe('stats and patterns over a stored game', () => {
     const analysis = await analyseGame(pool, imported!.pgn, { depth: 12 });
     saveAnalysis(db, { id: gameId!, player_color: 'white' }, analysis);
 
-    const stats = dashboard(db, player.id, 'all');
+    const stats = dashboard(db, player.id, { scope: 'all' });
     assert.equal(stats.headline.analysedGames, 1);
     assert.equal(stats.headline.record.win, 1);
     // Only White's four moves belong to the player.
     assert.equal(stats.headline.moves, 4);
     assert.equal(stats.headline.blundersPerGame, 0);
 
-    const blitzOnly = dashboard(db, player.id, 'blitz');
+    const blitzOnly = dashboard(db, player.id, { scope: 'blitz' });
     assert.equal(blitzOnly.headline.analysedGames, 1);
-    const bulletOnly = dashboard(db, player.id, 'bullet');
+    const bulletOnly = dashboard(db, player.id, { scope: 'bullet' });
     assert.equal(bulletOnly.headline.analysedGames, 0);
 
     // Clock data came through, so the pressure buckets have coverage.
     assert.ok(stats.clock.coverage > 0);
 
     // One game is never enough to name a pattern.
-    assert.deepEqual(detectPatterns(db, player.id, 'all'), []);
+    assert.deepEqual(detectPatterns(db, player.id, { scope: 'all' }), []);
   });
 });

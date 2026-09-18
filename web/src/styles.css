@@ -246,6 +246,55 @@ a {
   margin-left: 6px;
 }
 
+/* ---------- opening band ----------
+   The second lens sits directly under the first, so the two read as one control
+   stack: time class, then what came out of the opening. It carries no top rule of
+   its own — the band above already drew one. */
+
+.band-opening {
+  margin-top: 0;
+  border-top: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.band-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  padding: 8px 12px;
+  font: 600 12px/1.3 var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.band-select:focus-visible {
+  outline: 2px solid var(--vermilion);
+  outline-offset: 1px;
+}
+
+.band-clear {
+  flex: none;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--vermilion);
+  text-decoration: underline;
+}
+
+/* Wherever a screen states what it is showing, the opening it is narrowed to is
+   part of that statement — otherwise the numbers look like the whole history. */
+.opening-note {
+  color: var(--mark);
+  font-weight: 600;
+}
+
 /* ---------- stat row ---------- */
 
 .stat-row {
@@ -657,6 +706,39 @@ a {
 
 .row:hover {
   background: var(--wash);
+}
+
+/* ---------- openings ---------- */
+
+.openings {
+  padding-bottom: 12px;
+}
+
+.opening-row {
+  grid-template-columns: 52px 1fr 64px 68px 96px 72px 84px;
+}
+
+.row.opening-row.is-active {
+  background: var(--ink);
+  color: var(--bone);
+}
+
+.row.opening-row.is-active .meta,
+.row.opening-row.is-active .numeric {
+  color: var(--bone);
+  opacity: 0.86;
+}
+
+@media (max-width: 860px) {
+  /* Name and record carry the row on a phone; the rest is detail the sheet can
+     afford to drop rather than squeeze into 40 pixels. */
+  .opening-row {
+    grid-template-columns: 46px 1fr 60px 60px;
+  }
+
+  .opening-row > :nth-child(n + 5) {
+    display: none;
+  }
 }
 
 .result-win {
