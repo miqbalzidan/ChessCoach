@@ -19,6 +19,11 @@ class, with a plain-language coaching layer on top.
 - Per-move classification: brilliant · best · excellent · good · inaccuracy · mistake · blunder
 - Per-game accuracy for both sides
 - Board replay with an eval bar, the move played and the move the engine wanted
+- Both players' names, ratings and accuracy either side of the board
+- Pieces slide, and moves, captures and checks each sound different — synthesised in
+  the browser, so no audio files and nothing to download
+- Right-click a square to highlight it, right-drag for an arrow, left-click to clear
+- A link straight to the game's analysis board on Chess.com when it came from there
 
 **V2 — cross-game statistics**
 
@@ -35,6 +40,7 @@ class, with a plain-language coaching layer on top.
 - Clock-pressure correlation from the `[%clk]` data in live games
 - A Claude-written summary of the recurring weaknesses, with a suggested follow-up
   attached to each pattern
+- A link out to a lesson for whichever motif you keep repeating
 
 ---
 
@@ -208,5 +214,9 @@ The interface is a tournament scoresheet, not a dashboard of cards.
   blitz mistakes are a time-pressure signal, rapid mistakes are a preparation signal, and
   averaging the two hides both.
 - **Pieces are type**, not sprites — Unicode figurines, so the board scales anywhere.
+- **Only the dark squares are drawn.** The light ones are the board itself, so no two
+  painted squares share an edge and no seam can saw along the diagonals.
+- **Your markup is teal**, which is neither the vermilion of your mistakes nor the green
+  of the engine's move — a square you marked is never mistaken for a finding.
 - **A snapshot says when it was taken.** The one risk of reading a frozen sheet is
   mistaking last month's form for today's, so the date is in the masthead, not buried.

@@ -15,5 +15,5 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "../web/src/types.ts"]
+  "include": ["src/**/*.ts", "../web/src/types.ts", "../web/src/links.ts", "../web/src/format.ts"]
 }

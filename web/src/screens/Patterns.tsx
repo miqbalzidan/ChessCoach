@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { Board } from '../components/Board';
+import { lessonFor } from '../links';
 import { Empty, ErrorNote, Loading, TimeClassBand } from '../components/Chrome';
 import { formatClock, formatDate, pluralise } from '../format';
 import type { Coaching, Pattern, Scope, TimeClassSummary } from '../types';
@@ -298,6 +299,21 @@ function PatternCard({
                 ? ` · most often in ${pattern.topOpening.eco} (${pattern.topOpening.count}×)`
                 : ''}
             </div>
+            {(() => {
+              // Knowing the leak is half of it; the other half is somewhere to go and
+              // read about it, which is the one thing this app cannot supply itself.
+              const lesson = lessonFor(pattern.motif);
+              return lesson ? (
+                <a
+                  className="lesson-link"
+                  href={lesson.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  learn: {lesson.title} ↗
+                </a>
+              ) : null;
+            })()}
           </aside>
         </div>
       )}

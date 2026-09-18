@@ -1,10 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { inSnapshotMode } from '../snapshot';
 import { Board } from '../components/Board';
 import { ErrorNote, Loading } from '../components/Chrome';
-import { formatClock, formatDate, formatEval, glyphClass, timeControlLabel } from '../format';
+import {
+  formatClock,
+  formatDate,
+  formatEval,
+  glyphClass,
+  soundForSan,
+  timeControlLabel,
+} from '../format';
+import { playMoveSound, setSoundEnabled, soundEnabled } from '../sound';
+import { chesscomAnalysisUrl, lessonFor, motifsOf } from '../links';
 import { GLYPH, type Classification, type Game, type Move } from '../types';
 
 type Filter = 'all' | '??' | '?' | '?!';
@@ -23,6 +32,8 @@ export function Review() {
   const [filter, setFilter] = useState<Filter>('all');
   const [error, setError] = useState<string | null>(null);
   const [analysing, setAnalysing] = useState(false);
+  const [sound, setSound] = useState(soundEnabled);
+  const lastPly = useRef<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -50,6 +61,16 @@ export function Review() {
 
   const current = ply > 0 ? moves[ply - 1] : null;
   const playerColor = game?.player_color ?? 'white';
+
+  // Only on a real step. Landing on the first blunder when the game opens should be
+  // silent — a sound nobody asked for is the fastest way to get sound turned off.
+  useEffect(() => {
+    const previous = lastPly.current;
+    lastPly.current = ply;
+    if (previous === null || previous === ply) return;
+    const landed = ply > 0 ? moves[ply - 1] : null;
+    playMoveSound(landed ? soundForSan(landed.san) : 'move');
+  }, [ply, moves]);
 
   const counts = useMemo(() => {
     const own = moves.filter((move) => move.is_player === 1);
@@ -103,6 +124,27 @@ export function Review() {
   const opponentAccuracy =
     playerColor === 'white' ? game.accuracy_black : game.accuracy_white;
 
+  const analysisUrl = chesscomAnalysisUrl(game.url);
+
+  // The board is drawn from the player's side, so the far strip is the opponent's
+  // whenever the player is at the bottom — which is always, by construction.
+  const white = {
+    name: game.white_username,
+    rating: game.white_rating,
+    accuracy: game.accuracy_white,
+    colour: 'white' as const,
+    isPlayer: playerColor === 'white',
+  };
+  const black = {
+    name: game.black_username,
+    rating: game.black_rating,
+    accuracy: game.accuracy_black,
+    colour: 'black' as const,
+    isPlayer: playerColor === 'black',
+  };
+  const topPlayer = playerColor === 'white' ? black : white;
+  const bottomPlayer = playerColor === 'white' ? white : black;
+
   // Eval is always shown from the player's point of view.
   const evalCp = current
     ? current.color === playerColor
@@ -149,16 +191,7 @@ export function Review() {
 
   return (
     <div className="review">
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr auto',
-          alignItems: 'baseline',
-          gap: 24,
-          padding: '22px var(--margin) 18px',
-          borderBottom: '3px solid var(--ink)',
-        }}
-      >
+      <div className="review-head">
         <div>
           <div className="meta">
             {game.time_class} {timeControlLabel(game.time_control)} · {formatDate(game.end_time)} ·{' '}
@@ -170,7 +203,32 @@ export function Review() {
             {game.black_username}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 26, textAlign: 'right' }}>
+        <div className="review-scores">
+          <div className="review-actions">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                const next = !sound;
+                setSound(next);
+                setSoundEnabled(next);
+              }}
+              aria-pressed={sound}
+              title={sound ? 'Mute move sounds' : 'Unmute move sounds'}
+            >
+              {sound ? 'sound on' : 'sound off'}
+            </button>
+            {analysisUrl && (
+              <a
+                className="btn btn-ghost btn-sm"
+                href={analysisUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                chess.com ↗
+              </a>
+            )}
+          </div>
           <div>
             <div className="label-sm">you</div>
             <div className="numeric" style={{ font: '600 34px/1 var(--display)' }}>
@@ -202,16 +260,34 @@ export function Review() {
         </div>
 
         <div style={{ padding: '24px 28px 28px' }}>
+          {/* Whoever is playing from the far side sits above the board and the near
+              side below, the way you would read it over the table. */}
+          <PlayerStrip
+            name={topPlayer.name}
+            rating={topPlayer.rating}
+            accuracy={topPlayer.accuracy}
+            isPlayer={topPlayer.isPlayer}
+            colour={topPlayer.colour}
+          />
           <Board
             fen={fen}
             move={current?.uci ?? null}
             bestMove={current && current.classification !== 'best' ? current.best_move_uci : null}
             flipped={playerColor === 'black'}
+            animate
+            markable
             caption={
               current
                 ? `${current.move_number}${current.color === 'white' ? '.' : '…'} ${current.san} ${GLYPH[current.classification]} ${formatEval(current.eval_after * (current.color === playerColor ? 1 : -1), null)}`
                 : 'starting position'
             }
+          />
+          <PlayerStrip
+            name={bottomPlayer.name}
+            rating={bottomPlayer.rating}
+            accuracy={bottomPlayer.accuracy}
+            isPlayer={bottomPlayer.isPlayer}
+            colour={bottomPlayer.colour}
           />
 
           <div
@@ -234,7 +310,7 @@ export function Review() {
                   {current.clock_after !== null ? ` · ${formatClock(current.clock_after)} left` : ''}
                 </>
               ) : (
-                'use ← → to step through the game'
+                'use ← → to step through · right-click to mark, right-drag for an arrow'
               )}
             </span>
             <span
@@ -323,10 +399,52 @@ export function Review() {
               <div className="coach-prose" style={{ marginTop: 12, fontSize: 15 }}>
                 {describeMove(current)}
               </div>
+              {(() => {
+                // The first motif is the one the prose above leads with, so it is the
+                // one worth sending you to read about.
+                const lesson = lessonFor(motifsOf(current.motifs)[0]);
+                return lesson ? (
+                  <a
+                    className="lesson-link"
+                    href={lesson.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    learn: {lesson.title} ↗
+                  </a>
+                ) : null;
+              })()}
             </div>
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Name, rating and accuracy for one side of the board. */
+function PlayerStrip({
+  name,
+  rating,
+  accuracy,
+  isPlayer,
+  colour,
+}: {
+  name: string;
+  rating: number | null;
+  accuracy: number | null;
+  isPlayer: boolean;
+  colour: 'white' | 'black';
+}) {
+  return (
+    <div className={`player-strip${isPlayer ? ' is-you' : ''}`}>
+      <span className={`player-disc player-disc-${colour}`} aria-hidden="true" />
+      <span className="player-name">{name}</span>
+      {rating !== null && <span className="player-rating numeric">{rating}</span>}
+      {isPlayer && <span className="player-you">you</span>}
+      <span className="player-accuracy numeric">
+        {accuracy !== null ? `${accuracy.toFixed(1)}%` : '—'}
+      </span>
     </div>
   );
 }

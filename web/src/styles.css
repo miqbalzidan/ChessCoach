@@ -26,6 +26,7 @@
 
   --board-light: #efeadd;
   --board-dark: #b9a988;
+  --mark: #3f7d8c;
   --piece-white: #f6f1e4;
 
   --display: 'Bodoni Moda', 'Didot', 'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -683,9 +684,18 @@ a {
      same component works at review size and at pattern-example size. */
   container-type: inline-size;
   border: 1px solid var(--ink);
-  background-image: repeating-conic-gradient(var(--board-light) 0 25%, var(--board-dark) 0 50%);
-  background-size: 25% 25%;
+  /* The light squares are the board itself and only the dark ones are drawn, so no
+     two painted squares share an edge and there is no seam to saw. A repeating
+     gradient put its stops on fractional pixels and jagged along every diagonal. */
+  background: var(--board-light);
   user-select: none;
+}
+
+.board-dark-square {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  background: var(--board-dark);
 }
 
 .board-square {
@@ -727,6 +737,31 @@ a {
   justify-content: center;
   line-height: 1;
   color: var(--ink);
+  /* Clicks belong to the square underneath, so right-click markup works wherever
+     you aim it rather than only on the empty squares. */
+  pointer-events: none;
+}
+
+/* The piece is drawn on its destination square and run in from where it came. An
+   animation rather than a transition, because a transition needs a second render to
+   change the value and an animation just plays. */
+@keyframes piece-slide {
+  from {
+    transform: translate(var(--dx, 0), var(--dy, 0));
+  }
+  to {
+    transform: none;
+  }
+}
+
+.piece.is-sliding {
+  animation: piece-slide 170ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piece.is-sliding {
+    animation: none;
+  }
 }
 
 .piece-white {
@@ -933,6 +968,141 @@ a {
   }
 }
 
+/* The game's header. In the stylesheet rather than inline, because the phone
+   breakpoint has to be able to stack it — an inline grid-template-columns cannot be
+   overridden by a media query, and the scores would push the page sideways. */
+.review-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 24px;
+  padding: 22px var(--margin) 18px;
+  border-bottom: 3px solid var(--ink);
+}
+
+.review-scores {
+  display: flex;
+  gap: 26px;
+  text-align: right;
+  align-items: baseline;
+}
+
+/* ---------- players either side of the board ---------- */
+
+.player-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 9px 2px;
+  font: 400 13px/1 var(--mono);
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* The strip under the board closes it off; the one above opens it. */
+.board-wrap + .player-strip {
+  border-bottom: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.player-strip.is-you .player-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Which colour this player had, since the board can be the other way up. */
+.player-disc {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  align-self: center;
+  flex: none;
+}
+
+.player-disc-white {
+  background: var(--piece-white);
+}
+
+.player-disc-black {
+  background: var(--ink);
+}
+
+.player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-rating {
+  color: var(--muted);
+}
+
+.player-you {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--vermilion);
+}
+
+.player-accuracy {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+.review-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-sm {
+  font-size: 10px;
+  padding: 7px 11px;
+  text-decoration: none;
+}
+
+/* Reading about the motif is the next step after seeing it, so the link sits inside
+   the panel that names it rather than somewhere else on the page. */
+.lesson-link {
+  display: inline-block;
+  margin-top: 14px;
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vermilion-pale);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(232, 226, 212, 0.35);
+  padding-bottom: 3px;
+}
+
+.lesson-link:hover {
+  color: #fff;
+  border-bottom-color: #fff;
+}
+
+/* Your own markup: a colour that is neither vermilion (which means your mistake)
+   nor the engine's green, so a square you marked is never read as a finding. */
+.square-marked {
+  background: rgba(63, 125, 140, 0.45);
+  box-shadow: inset 0 0 0 2px var(--mark);
+}
+
+.board-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.board-arrows line {
+  stroke: var(--mark);
+  stroke-width: 0.16;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
 /* An expanded pattern: the boards on the left, the follow-up beside them. This
    lives here rather than inline so the phone breakpoint below can collapse it —
    an inline grid-template-columns cannot be overridden by a media query, and a
@@ -1010,6 +1180,22 @@ a {
   /* The follow-up reads after the boards it refers to, not beside them. */
   .pattern-detail {
     grid-template-columns: 1fr;
+  }
+
+  .review-head {
+    grid-template-columns: 1fr;
+  }
+
+  /* Names are long and the scores are wide; together they do not fit a phone, so
+     they stack and read left to right like everything else. */
+  .review-scores {
+    flex-wrap: wrap;
+    gap: 18px;
+    text-align: left;
+  }
+
+  .review-actions {
+    flex-wrap: wrap;
   }
 }
 
