@@ -121,6 +121,12 @@ arrive already analysed, at the depth the computer used — 44 games seed in abo
 second — and from then on the phone only has to keep up with what you play. Opening a
 newer export later adds just the games since.
 
+Getting games onto the phone in the first place: **open a `.pgn` file**. Chess.com
+will hand you your whole archive as a download, and the Import screen takes it without
+asking the network for anything, so nothing can block it. Importing straight from
+Chess.com by username is also offered, but a browser may not be allowed to call their
+API — if it is refused, the screen says so and points at the file.
+
 With no computer anywhere, import on the phone anyway. Before starting anything long
 the app says how long it will take, measured on that handset rather than guessed, and
 the analysis is resumable — leave and come back and it carries on. It is a warning,

@@ -26,10 +26,16 @@ export function Import({ onImported }: { onImported: (username: string) => void 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [estimate, setEstimate] = useState<{ games: number; seconds: number } | null>(null);
+  /** A picked .pgn is held here rather than in the textarea: an exported archive can
+   *  be hundreds of kilobytes, and putting that through a controlled input makes a
+   *  phone crawl for no benefit — nobody reads a year of PGN in a text box. */
+  const [file, setFile] = useState<{ name: string; text: string; games: number } | null>(null);
   const pollRef = useRef<number | null>(null);
+  const pgnInput = useRef<HTMLInputElement>(null);
 
   const local = inLocalMode();
-  const gameCount = mode === 'pgn' ? splitPgns(pgn).length : limit;
+  const pgnText = file?.text ?? pgn;
+  const gameCount = mode === 'pgn' ? (file?.games ?? splitPgns(pgn).length) : limit;
 
   /**
    * On this device, an import is minutes of its own CPU, so it says how many before
@@ -84,7 +90,7 @@ export function Import({ onImported }: { onImported: (username: string) => void 
       const response =
         mode === 'chesscom'
           ? await api.importChessCom({ username: username.trim(), limit, timeClasses })
-          : await api.importPgn({ username: username.trim(), pgn });
+          : await api.importPgn({ username: username.trim(), pgn: pgnText });
       const created = await api.job(response.jobId);
       setJob(created.job);
     } catch (err) {
@@ -95,6 +101,22 @@ export function Import({ onImported }: { onImported: (username: string) => void 
   };
 
   const longImport = estimate !== null && estimate.seconds >= 120;
+
+  async function onPickPgn(picked: File | undefined): Promise<void> {
+    if (!picked) return;
+    setError(null);
+    try {
+      const text = await picked.text();
+      const games = splitPgns(text).length;
+      if (games === 0) {
+        setError(`${picked.name} has no games in it — it should be a .pgn export.`);
+        return;
+      }
+      setFile({ name: picked.name, text, games });
+    } catch {
+      setError('That file could not be read.');
+    }
+  }
 
   const toggleClass = (timeClass: TimeClass) => {
     setTimeClasses((current) =>
@@ -206,12 +228,46 @@ export function Import({ onImported }: { onImported: (username: string) => void 
           </>
         ) : (
           <label className="field" style={{ marginBottom: 28 }}>
-            <span className="field-label">pgn — paste one game or a whole export</span>
+            <span className="field-label">pgn — paste games, or open a file</span>
+
+            {/* The dependable path on a phone. Chess.com will hand you your whole
+                archive as a .pgn download; this takes it without asking the network
+                for anything, so nothing can block it. */}
+            <div className="pgn-file">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={busy}
+                onClick={() => pgnInput.current?.click()}
+              >
+                open a .pgn file
+              </button>
+              {file && (
+                <span className="pgn-file-name">
+                  {file.name} — {pluralise(file.games, 'game')}
+                  <button type="button" className="band-clear" onClick={() => setFile(null)}>
+                    clear
+                  </button>
+                </span>
+              )}
+              <input
+                ref={pgnInput}
+                type="file"
+                accept=".pgn,text/plain"
+                style={{ display: 'none' }}
+                onChange={(event) => void onPickPgn(event.target.files?.[0])}
+              />
+            </div>
+
             <textarea
               className="textarea"
-              value={pgn}
-              disabled={busy}
-              placeholder={'[Event "Live Chess"]\n[White "you"]\n…\n\n1. e4 e5 2. Nf3 …'}
+              value={file ? '' : pgn}
+              disabled={busy || file !== null}
+              placeholder={
+                file
+                  ? `Using ${file.name}. Clear it to paste games instead.`
+                  : '[Event "Live Chess"]\n[White "you"]\n…\n\n1. e4 e5 2. Nf3 …'
+              }
               onChange={(event) => setPgn(event.target.value)}
             />
           </label>
@@ -242,7 +298,7 @@ export function Import({ onImported }: { onImported: (username: string) => void 
             busy ||
             submitting ||
             !username.trim() ||
-            (mode === 'pgn' && !pgn.trim()) ||
+            (mode === 'pgn' && !pgnText.trim()) ||
             (mode === 'chesscom' && timeClasses.length === 0)
           }
         >

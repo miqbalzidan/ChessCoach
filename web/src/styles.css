@@ -1525,3 +1525,21 @@ a {
   font: 600 17px/1.2 var(--display);
   margin-bottom: 8px;
 }
+
+/* ---------- opening a .pgn ---------- */
+
+.pgn-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pgn-file-name {
+  font: 400 12px/1.3 var(--mono);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
