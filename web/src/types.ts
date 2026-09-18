@@ -15,30 +15,13 @@ export type Classification =
 export const TIME_CLASSES: TimeClass[] = ['bullet', 'blitz', 'rapid', 'daily'];
 
 /* ---------- the lens ----------
-   What the whole sheet is narrowed to. Time class was the only lens for a long
-   while; an opening is a second one, and the two compose — "the Berlin as Black,
-   in blitz" is a question the stored analysis can already answer.
+   Defined in core, because the server, the browser and the analysis all narrow by
+   it. Re-exported here so every screen keeps importing it from one place. */
 
-   Everything downstream takes a Lens rather than a Scope, so a report cannot be
-   computed for one narrowing and labelled with another. */
+import type { Lens } from '../../core/src/types';
 
-export interface Lens {
-  scope: Scope;
-  /** ECO code, e.g. C65. Absent means every opening. */
-  eco?: string | null;
-  /** Which side the player had. Absent means both. */
-  color?: 'white' | 'black' | null;
-}
-
-/**
- * One stable string per lens — the coaching cache key, the snapshot key, and the
- * effect dependency on the client. An unfiltered lens keys as its bare scope, so
- * `all` and `blitz` mean exactly what they always did.
- */
-export function lensKey(lens: Lens): string {
-  if (!lens.eco) return lens.scope;
-  return lens.color ? `${lens.scope}:${lens.eco}:${lens.color}` : `${lens.scope}:${lens.eco}`;
-}
+export type { Lens };
+export { lensKey } from '../../core/src/types';
 
 /** Chess's own annotation vocabulary is the icon set. */
 export const GLYPH: Record<Classification, string> = {

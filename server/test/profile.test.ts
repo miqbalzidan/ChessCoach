@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { test, describe } from 'node:test';
 import Database from 'better-sqlite3';
-import { migrate, type DB } from '../src/db.js';
-import { profile } from '../src/profile.js';
+import { migrate, type DB } from '../../core/src/db.js';
+import { profile } from '../../core/src/profile.js';
 
 /** A database with one player and nothing else. */
 function freshDb(): DB {

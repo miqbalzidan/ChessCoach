@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test, describe } from 'node:test';
 import { chesscomAnalysisUrl, LESSONS, lessonFor, motifsOf } from '../../web/src/links.js';
 import { soundForSan } from '../../web/src/format.js';
-import { MOTIF_LABELS } from '../src/motifs.js';
+import { MOTIF_LABELS } from '../../core/src/motifs.js';
 
 describe('chesscomAnalysisUrl', () => {
   test('turns a game link into its analysis link', () => {

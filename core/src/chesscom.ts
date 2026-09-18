@@ -1,14 +1,28 @@
 import { parsePgn } from './analysis.js';
 import { TIME_CLASSES, type ImportedGame, type TimeClass } from './types.js';
 
-const API_BASE = process.env.CHESSCOM_API_BASE ?? 'https://api.chess.com/pub';
+let API_BASE = 'https://api.chess.com/pub';
 
 /**
- * Chess.com rejects requests without a descriptive User-Agent, and asks that
- * tools identify themselves so they can be contacted about traffic.
+ * Chess.com rejects requests without a descriptive User-Agent, and asks that tools
+ * identify themselves so they can be contacted about traffic.
+ *
+ * A browser will not let us send one: User-Agent is a forbidden header name, so the
+ * fetch below silently drops it there. That is why this is configuration rather than
+ * a constant — a host that cannot set it says so, and the caller can decide what to
+ * do about a request Chess.com may refuse.
  */
-const USER_AGENT =
-  process.env.CHESSCOM_USER_AGENT ?? 'ChessCoach/0.1 (personal game analysis; +https://github.com/)';
+let userAgent = 'ChessCoach/0.1 (personal game analysis; +https://github.com/)';
+
+export interface ChessComConfig {
+  apiBase?: string;
+  userAgent?: string;
+}
+
+export function configureChessCom(config: ChessComConfig): void {
+  if (config.apiBase) API_BASE = config.apiBase;
+  if (config.userAgent) userAgent = config.userAgent;
+}
 
 export class ChessComError extends Error {
   constructor(
@@ -35,7 +49,7 @@ interface RawPlayerGame {
 
 async function request<T>(url: string, attempt = 0): Promise<T> {
   const response = await fetch(url, {
-    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+    headers: { 'User-Agent': userAgent, Accept: 'application/json' },
   });
 
   // Chess.com throttles bursts with 429; backing off is the documented remedy.

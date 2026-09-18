@@ -12,9 +12,7 @@
  * `@eco` without a binding for it is a runtime error, and keeping them in one
  * function makes that impossible.
  */
-import type { Lens, Scope } from '../../web/src/types.js';
-import { lensKey } from '../../web/src/types.js';
-import { TIME_CLASSES } from './types.js';
+import { lensKey, TIME_CLASSES, type Lens, type Scope } from './types.js';
 
 export type { Lens, Scope };
 export { lensKey };

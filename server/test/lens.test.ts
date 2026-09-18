@@ -1,14 +1,14 @@
 import { strict as assert } from 'node:assert';
 import { test, describe } from 'node:test';
 import Database from 'better-sqlite3';
-import { migrate, type DB } from '../src/db.js';
-import { lensClause, lensKey, lensLabel, parseLens } from '../src/lens.js';
-import { dashboard, openings } from '../src/stats.js';
-import { detectPatterns } from '../src/patterns.js';
-import { profile } from '../src/profile.js';
-import { listGames } from '../src/store.js';
-import { readCachedCoaching, writeCachedCoaching } from '../src/coach.js';
-import type { Coaching } from '../src/coach.js';
+import { migrate, type DB } from '../../core/src/db.js';
+import { lensClause, lensKey, lensLabel, parseLens } from '../../core/src/lens.js';
+import { dashboard, openings } from '../../core/src/stats.js';
+import { detectPatterns } from '../../core/src/patterns.js';
+import { profile } from '../../core/src/profile.js';
+import { listGames } from '../../core/src/store.js';
+import { readCachedCoaching, writeCachedCoaching } from '../../core/src/coach.js';
+import type { Coaching } from '../../core/src/coach.js';
 
 function freshDb(): DB {
   const db = new Database(':memory:');

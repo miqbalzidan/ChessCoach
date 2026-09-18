@@ -6,8 +6,8 @@ import { resolve } from 'node:path';
 import { test, describe } from 'node:test';
 import Database from 'better-sqlite3';
 import { buildSnapshot, inlineIntoHtml } from '../src/export.js';
-import { migrate, type DB } from '../src/db.js';
-import { openings } from '../src/stats.js';
+import { migrate, type DB } from '../../core/src/db.js';
+import { openings } from '../../core/src/stats.js';
 import { lensKey, SNAPSHOT_VERSION, type Scope, type Snapshot } from '../../web/src/types.js';
 
 const SCOPES: Scope[] = ['all', 'bullet', 'blitz', 'rapid', 'daily'];

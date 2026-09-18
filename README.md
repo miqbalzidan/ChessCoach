@@ -190,8 +190,8 @@ K ≈ 10, so a pattern that cost you 4.1 expected points reads as −41 Elo.
 ## Layout
 
 ```
-server/
-  engine.ts      Stockfish UCI process pool
+core/            No Node, no DOM — so it runs on a server or inside a phone.
+  engine.ts      UCI protocol and the engine queue, transport-agnostic
   analysis.ts    PGN → per-move evaluation, classification, clocks
   evaluation.ts  Win-percentage model, accuracy, classification thresholds
   motifs.ts      Why a move lost value — the vocabulary patterns cluster on
@@ -199,10 +199,17 @@ server/
   profile.ts     Strengths and weaknesses — the scouting report
   lens.ts        What a report is narrowed to: a time class, and maybe an opening
   stats.ts       Dashboard aggregation, through a lens
-  coach.ts       Claude coaching layer, with an offline fallback
+  store.ts       Every query, against core's DB interface
+  db.ts          The schema, the migration, and the interface both hosts satisfy
+  coach.ts       The brief, the offline summariser, the per-lens cache
   chesscom.ts    Public API client
-  seed.ts        Offline demo-history generator
+server/          What only a computer can do.
+  db-node.ts     SQLite as a native binding, in a file on disk
+  engine-node.ts Stockfish as a spawned process
+  coach-claude.ts The model call — the only part needing a key and a network
+  api.ts         HTTP routes over core
   export.ts      Freezes a player into a portable snapshot
+  seed.ts        Offline demo-history generator
 web/
   screens/       Dashboard, Library, Review, Patterns, Import, Settings
   components/    Board, baseline bars, time-class and opening bands, masthead

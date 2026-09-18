@@ -69,6 +69,10 @@ export function parseIncrement(timeControl: string | undefined): number {
   return match ? Number(match[1]) : 0;
 }
 
+/** Where the depth lands when a caller does not say. Hosts override it from their
+ *  own settings — the server from the database, the phone from a lower default. */
+export const DEFAULT_DEPTH = 16;
+
 export interface AnalyseOptions {
   depth?: number;
   onProgress?: (done: number, total: number) => void;
@@ -84,7 +88,7 @@ export async function analyseGame(
   pgn: string,
   options: AnalyseOptions = {},
 ): Promise<GameAnalysis> {
-  const depth = options.depth ?? Number(process.env.ANALYSIS_DEPTH ?? 16);
+  const depth = options.depth ?? DEFAULT_DEPTH;
   const parsed = parsePgn(pgn);
   if (parsed.moves.length === 0) {
     return { moves: [], accuracyWhite: 100, accuracyBlack: 100, depth, engine: pool.engineName };

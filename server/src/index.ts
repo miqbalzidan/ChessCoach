@@ -2,14 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { getDb } from './db.js';
-import { EnginePool } from './engine.js';
+import { getDb } from './db-node.js';
+import { createEnginePool } from './engine-node.js';
 import { createApi } from './api.js';
 
 const PORT = Number(process.env.PORT ?? 8787);
 
 const db = getDb();
-const pool = new EnginePool();
+const pool = createEnginePool();
 
 const app = express();
 app.use(cors());

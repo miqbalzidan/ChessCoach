@@ -7,6 +7,7 @@
   "include": [
     "src/**/*.ts",
     "test/**/*.ts",
+    "../core/src/**/*.ts",
     "../web/src/types.ts",
     "../web/src/links.ts",
     "../web/src/format.ts"

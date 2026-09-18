@@ -1,14 +1,19 @@
-import Anthropic from '@anthropic-ai/sdk';
+/**
+ * The coaching layer, minus the model call.
+ *
+ * Everything here runs anywhere: the brief that gets handed to Claude, the offline
+ * summariser that writes the same shape deterministically, and the per-lens cache.
+ * Only the API call itself needs a key and a network, and that lives in
+ * `server/src/coach-claude.ts` — which is why a phone with no key still gets a
+ * written summary rather than an empty panel.
+ */
 import { z } from 'zod';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { DB } from './db.js';
 import type { Pattern } from './patterns.js';
 import { lensKey, lensLabel, type Lens } from './lens.js';
 import type { dashboard } from './stats.js';
 
-const MODEL = process.env.COACH_MODEL ?? 'claude-opus-5';
-
-const CoachingSchema = z.object({
+export const CoachingSchema = z.object({
   headline: z
     .string()
     .describe('One sentence naming the single biggest recurring weakness, in plain language.'),
@@ -31,7 +36,7 @@ const CoachingSchema = z.object({
 
 export type Coaching = z.infer<typeof CoachingSchema> & { model: string; generatedAt: number };
 
-const SYSTEM_PROMPT = `You are a chess coach reviewing one player's analysed game history.
+export const SYSTEM_PROMPT = `You are a chess coach reviewing one player's analysed game history.
 
 You are given aggregate statistics and mistake patterns that were detected by an engine,
 not by you. Treat every number in the brief as fact and never invent new ones.
@@ -48,10 +53,6 @@ export interface CoachingInput {
   lens: Lens;
   stats: ReturnType<typeof dashboard>;
   patterns: Pattern[];
-}
-
-export function hasApiKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 }
 
 /**
@@ -150,56 +151,7 @@ export function listPhrase(items: string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
-export async function generateCoaching(input: CoachingInput): Promise<Coaching> {
-  if (input.patterns.length === 0) {
-    return { ...emptyCoaching(), model: 'none', generatedAt: now() };
-  }
-  if (!hasApiKey()) {
-    return { ...fallbackCoaching(input), model: 'offline', generatedAt: now() };
-  }
-
-  const client = new Anthropic();
-  const brief = buildBrief(input);
-
-  try {
-    const response = await client.messages.parse({
-      model: MODEL,
-      max_tokens: 16000,
-      system: SYSTEM_PROMPT,
-      thinking: { type: 'adaptive' },
-      output_config: { format: zodOutputFormat(CoachingSchema) },
-      messages: [
-        {
-          role: 'user',
-          content: `${brief}\n\nWrite the coaching summary. Cover every pattern key listed above, in the same order.`,
-        },
-      ],
-    });
-
-    const parsed = response.parsed_output;
-    if (!parsed) return { ...fallbackCoaching(input), model: 'offline', generatedAt: now() };
-    return { ...parsed, model: response.model, generatedAt: now() };
-  } catch (error) {
-    // Coaching is a layer on top of the analysis, never a prerequisite for it, so a
-    // failed call degrades to the deterministic summary instead of failing the page.
-    if (error instanceof Anthropic.AuthenticationError) {
-      return { ...fallbackCoaching(input), model: 'offline (invalid API key)', generatedAt: now() };
-    }
-    if (error instanceof Anthropic.RateLimitError) {
-      return { ...fallbackCoaching(input), model: 'offline (rate limited)', generatedAt: now() };
-    }
-    if (error instanceof Anthropic.APIError) {
-      return {
-        ...fallbackCoaching(input),
-        model: `offline (API error ${error.status})`,
-        generatedAt: now(),
-      };
-    }
-    throw error;
-  }
-}
-
-function emptyCoaching(): z.infer<typeof CoachingSchema> {
+export function emptyCoaching(): z.infer<typeof CoachingSchema> {
   return {
     headline: 'Not enough analysed games yet to find a repeating pattern.',
     diagnosis:
@@ -250,7 +202,7 @@ export function fallbackCoaching(input: CoachingInput): z.infer<typeof CoachingS
   };
 }
 
-function now(): number {
+export function now(): number {
   return Math.floor(Date.now() / 1000);
 }
 

@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express';
-import type { DB } from './db.js';
-import { getSetting, setSetting } from './db.js';
-import type { EnginePool } from './engine.js';
-import { analyseGame } from './analysis.js';
+import type { DB } from './db-node.js';
+import { getSetting, setSetting } from './db-node.js';
+import type { EnginePool } from './engine-node.js';
+import { analyseGame } from '../../core/src/analysis.js';
 import {
   createJob,
   getJob,
@@ -10,7 +10,7 @@ import {
   runImport,
   runPgnImport,
   analysePending,
-} from './importer.js';
+} from '../../core/src/importer.js';
 import {
   deletePlayerData,
   findPlayer,
@@ -20,14 +20,15 @@ import {
   listPlayers,
   saveAnalysis,
   upsertPlayer,
-} from './store.js';
-import { dashboard, openings } from './stats.js';
-import { parseEco, parseLens, parseScope } from './lens.js';
-import { detectPatterns } from './patterns.js';
-import { profile } from './profile.js';
-import { generateCoaching, hasApiKey, readCachedCoaching, writeCachedCoaching } from './coach.js';
-import { MOTIF_LABELS } from './motifs.js';
-import { TIME_CLASSES, type GameResult, type TimeClass } from './types.js';
+} from '../../core/src/store.js';
+import { dashboard, openings } from '../../core/src/stats.js';
+import { parseEco, parseLens, parseScope } from '../../core/src/lens.js';
+import { detectPatterns } from '../../core/src/patterns.js';
+import { profile } from '../../core/src/profile.js';
+import { readCachedCoaching, writeCachedCoaching } from '../../core/src/coach.js';
+import { generateCoaching, hasApiKey } from './coach-claude.js';
+import { MOTIF_LABELS } from '../../core/src/motifs.js';
+import { TIME_CLASSES, type GameResult, type TimeClass } from '../../core/src/types.js';
 
 export function createApi(db: DB, pool: EnginePool): Router {
   const router = Router();

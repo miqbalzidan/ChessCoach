@@ -3,13 +3,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
-import { parsePgn, parseIncrement, analyseGame } from '../src/analysis.ts';
-import { gamesFromPgnText, inferTimeClass, splitPgns } from '../src/importer.ts';
-import { EnginePool } from '../src/engine.ts';
-import { detectPatterns } from '../src/patterns.ts';
-import { migrate } from '../src/db.ts';
-import { insertGame, saveAnalysis, upsertPlayer } from '../src/store.ts';
-import { dashboard } from '../src/stats.ts';
+import { parsePgn, parseIncrement, analyseGame } from '../../core/src/analysis.ts';
+import { gamesFromPgnText, inferTimeClass, splitPgns } from '../../core/src/importer.ts';
+import { createEnginePool, type EnginePool } from '../src/engine-node.js';
+import { detectPatterns } from '../../core/src/patterns.ts';
+import { migrate } from '../../core/src/db.ts';
+import { insertGame, saveAnalysis, upsertPlayer } from '../../core/src/store.ts';
+import { dashboard } from '../../core/src/stats.ts';
 import Database from 'better-sqlite3';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -102,7 +102,7 @@ describe('gamesFromPgnText', () => {
 
 describe('analyseGame', () => {
   it('classifies the moves and scores the game', async (t) => {
-    const pool = new EnginePool(2, 32, 1);
+    const pool = createEnginePool(2, 32, 1);
     t.after(() => pool.close());
 
     const analysis = await analyseGame(pool, fixture('blitz-clocks.pgn'), { depth: 12 });
@@ -126,7 +126,7 @@ describe('analyseGame', () => {
   });
 
   it('derives time spent per move from the clocks and increment', async (t) => {
-    const pool = new EnginePool(2, 32, 1);
+    const pool = createEnginePool(2, 32, 1);
     t.after(() => pool.close());
 
     const analysis = await analyseGame(pool, fixture('blitz-clocks.pgn'), { depth: 10 });
@@ -136,7 +136,7 @@ describe('analyseGame', () => {
   });
 
   it('finds the rook sacrifice in the Opera Game', async (t) => {
-    const pool = new EnginePool(3, 64, 1);
+    const pool = createEnginePool(3, 64, 1);
     t.after(() => pool.close());
 
     const analysis = await analyseGame(pool, fixture('opera.pgn'), { depth: 16 });
@@ -146,7 +146,7 @@ describe('analyseGame', () => {
   });
 
   it('returns an empty analysis for a game with no moves', async (t) => {
-    const pool = new EnginePool(1, 16, 1);
+    const pool = createEnginePool(1, 16, 1);
     t.after(() => pool.close());
 
     const analysis = await analyseGame(pool, '[Event "empty"]\n\n*', { depth: 8 });
@@ -157,7 +157,7 @@ describe('analyseGame', () => {
 
 describe('stats and patterns over a stored game', () => {
   it('aggregates the player side only', async (t) => {
-    const pool = new EnginePool(2, 32, 1);
+    const pool = createEnginePool(2, 32, 1);
     const db = new Database(':memory:');
     migrate(db);
     t.after(() => {

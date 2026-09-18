@@ -4,26 +4,18 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "lib": [
-      "ES2023"
+      "ES2023",
+      "WebWorker"
     ],
-    "outDir": "dist",
-    "rootDir": "..",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
     "declaration": false,
-    "sourceMap": true,
-    "types": [
-      "node"
-    ]
+    "noEmit": true,
+    "types": []
   },
   "include": [
-    "src/**/*.ts",
-    "../core/src/**/*.ts",
-    "../web/src/types.ts",
-    "../web/src/links.ts",
-    "../web/src/format.ts"
+    "src/**/*.ts"
   ]
 }
