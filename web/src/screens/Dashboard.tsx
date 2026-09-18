@@ -151,9 +151,16 @@ export function Dashboard({
           You keep losing
           <br />
           the same <em>{patterns.length || headline.analysedGames}</em>{' '}
-          {/* One leak is a way, not "1 ways" — and narrowing to one opening lands on
-              a single pattern often enough that the plural cannot be assumed. */}
-          {patterns.length === 1 ? 'way.' : patterns.length ? 'ways.' : 'games.'}
+          {/* One leak is a way, not "1 ways"; one game is a game, not "1 games". Both
+              singulars turn up for real — an opening filter often lands on a single
+              pattern, and a phone's first import is often a single game. */}
+          {patterns.length > 0
+            ? patterns.length === 1
+              ? 'way.'
+              : 'ways.'
+            : headline.analysedGames === 1
+              ? 'game.'
+              : 'games.'}
         </h1>
         <div className="headline-aside">
           {pluralise(headline.analysedGames, 'game')} analysed
