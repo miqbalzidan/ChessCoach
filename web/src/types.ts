@@ -179,6 +179,12 @@ export interface TimeClassSummary {
   winRate: number;
 }
 
+export interface AnalysisSource {
+  engine: string;
+  depth: number;
+  games: number;
+}
+
 export interface Dashboard {
   player: Player;
   scope: Scope;
@@ -192,6 +198,9 @@ export interface Dashboard {
   openings: OpeningRow[];
   clock: { buckets: ClockBucket[]; coverage: number; worstMultiplier: number };
   classifications: Array<{ classification: Classification; count: number }>;
+  /** Which engine and depth produced these games. More than one entry means the
+   *  figures below mix instruments, which the sheet says rather than hides. */
+  sources: AnalysisSource[];
 }
 
 export interface PatternExample {

@@ -368,6 +368,37 @@ export function timeClassSummary(db: DB, playerId: number, lens: Lens): TimeClas
   });
 }
 
+export interface AnalysisSource {
+  engine: string;
+  depth: number;
+  games: number;
+}
+
+/**
+ * Which instruments produced these numbers.
+ *
+ * Normally one. But a phone seeded from a computer holds games analysed by a desktop
+ * Stockfish at depth 16 alongside ones it analysed itself at 12, and a shallower
+ * search reads as more mistakes — so an accuracy trend across that boundary shows a
+ * step the player never played. The schema has always recorded this per game; the
+ * sheet has to be able to say it rather than averaging two rulers and calling the
+ * result a measurement.
+ */
+export function analysisSources(db: DB, playerId: number, lens: Lens): AnalysisSource[] {
+  const narrowing = lensClause(lens, '');
+  return db
+    .prepare(
+      `SELECT COALESCE(engine, 'unknown engine') AS engine,
+              COALESCE(analysis_depth, 0) AS depth,
+              COUNT(*) AS games
+         FROM games
+        WHERE player_id = @player AND analysed_at IS NOT NULL${narrowing}
+        GROUP BY engine, analysis_depth
+        ORDER BY games DESC, engine`,
+    )
+    .all(lensParams(playerId, lens)) as AnalysisSource[];
+}
+
 export interface ClassificationCount {
   classification: string;
   count: number;
@@ -405,5 +436,6 @@ export function dashboard(db: DB, playerId: number, lens: Lens) {
     openings: openings(db, playerId, lens),
     clock: clockPressure(db, playerId, lens),
     classifications: classificationCounts(db, playerId, lens),
+    sources: analysisSources(db, playerId, lens),
   };
 }

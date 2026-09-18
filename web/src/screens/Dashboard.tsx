@@ -14,6 +14,7 @@ import {
 import { pluralise, relativeTime, scopeLabel, signed } from '../format';
 import { lensKey } from '../types';
 import type {
+  AnalysisSource,
   Coaching,
   Dashboard as DashboardData,
   Lens,
@@ -160,7 +161,8 @@ export function Dashboard({
           {headline.record.win}W · {headline.record.loss}L · {headline.record.draw}D ·{' '}
           {headline.winRate.toFixed(0)}% wins
           <br />
-          {engine ? `${engine} · ` : ''}synced {relativeTime(data.player.last_synced_at)}
+          {describeSources(data.sources) || (engine ? `${engine}` : '')}
+          {' · '}synced {relativeTime(data.player.last_synced_at)}
           {openingNote ? (
             <>
               <br />
@@ -247,6 +249,23 @@ export function Dashboard({
           </div>
         </div>
       </div>
+
+      {data.sources.length > 1 && (
+        /* Sat with the trend on purpose: this is the chart someone would otherwise
+           read as improvement or decline, when part of the step is the instrument
+           changing underneath it. */
+        <div className="mixed-analysis">
+          <div className="label">two engines in this segment</div>
+          <div className="prose">
+            {data.sources
+              .map((source) => `${pluralise(source.games, 'game')} by ${source.engine} at depth ${source.depth}`)
+              .join(', ')}
+            . A shallower search finds more to complain about, so part of any step in the
+            trend below is the measurement changing rather than your chess. Compare like
+            with like before reading much into it.
+          </div>
+        </div>
+      )}
 
       <div className="chart-block">
         <div className="chart-head">
@@ -554,6 +573,23 @@ function TraitColumn({
       )}
     </div>
   );
+}
+
+/**
+ * The provenance line: one instrument named, or a count when there are several.
+ *
+ * The exact split is spelled out beside the trend, where it actually matters; up here
+ * it only needs to stop the masthead claiming a single engine measured everything.
+ */
+function describeSources(sources: AnalysisSource[]): string {
+  if (sources.length === 0) return '';
+  if (sources.length === 1) {
+    const only = sources[0]!;
+    return `${only.engine} · depth ${only.depth}`;
+  }
+  return `${sources.length} engines · depth ${Math.min(...sources.map((s) => s.depth))}–${Math.max(
+    ...sources.map((s) => s.depth),
+  )}`;
 }
 
 function severityOf(pattern: Pattern): string {

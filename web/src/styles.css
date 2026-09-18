@@ -1543,3 +1543,19 @@ a {
   align-items: center;
   gap: 10px;
 }
+
+/* ---------- mixed analysis ----------
+   Sits above the trend, because that is the chart it changes the reading of. */
+
+.mixed-analysis {
+  margin: 24px var(--margin) 0;
+  padding: 16px 20px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--mark);
+  background: var(--wash);
+}
+
+.mixed-analysis .prose {
+  margin-top: 8px;
+  max-width: 68ch;
+}

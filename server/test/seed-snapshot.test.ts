@@ -240,3 +240,51 @@ describe('seeding a phone from an export', () => {
     phone.close();
   });
 });
+
+describe('saying which instrument produced which games', () => {
+  test('a seeded phone reports both engines, per lens', async () => {
+    const pc = source();
+    const phone = freshDb();
+    seedFromSnapshot(phone, await buildSnapshot(pc, 'tester'));
+
+    // Everything: the desktop's five and the phone's two.
+    const all = dashboard(phone, 1, { scope: 'all' }).sources;
+    assert.deepEqual(
+      all.map((s) => `${s.engine}@${s.depth}×${s.games}`),
+      ['Stockfish 16@16×5', 'Stockfish 19 Lite WASM@12×2'],
+    );
+
+    // Narrowed to a segment that only one of them touched, there is nothing to warn
+    // about — and a warning shown where it does not apply is noise that gets ignored
+    // where it does.
+    const daily = dashboard(phone, 1, { scope: 'daily' }).sources;
+    assert.equal(daily.length, 1);
+    assert.equal(daily[0]!.engine, 'Stockfish 19 Lite WASM');
+
+    const blitz = dashboard(phone, 1, { scope: 'blitz' }).sources;
+    assert.equal(blitz.length, 1);
+    assert.equal(blitz[0]!.depth, 16);
+
+    pc.close();
+    phone.close();
+  });
+
+  test('unanalysed games are not an instrument', async () => {
+    const pc = source();
+    pc.prepare(
+      `INSERT INTO games (id, player_id, external_id, source, pgn, time_class, time_control,
+                          end_time, white_username, black_username, player_color, result,
+                          opponent, move_count, created_at)
+       VALUES (50, 1, 'pending', 'chess.com', '', 'blitz', '600+0', 1800000000, 'tester',
+               'other', 'white', 'win', 'other', 10, 0)`,
+    ).run();
+
+    const sources = dashboard(pc, 1, { scope: 'all' }).sources;
+    assert.equal(
+      sources.reduce((sum, s) => sum + s.games, 0),
+      7,
+      'a game waiting to be analysed was counted as analysed by something',
+    );
+    pc.close();
+  });
+});
