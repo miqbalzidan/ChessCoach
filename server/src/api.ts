@@ -23,6 +23,7 @@ import {
 } from './store.js';
 import { dashboard, type Scope } from './stats.js';
 import { detectPatterns } from './patterns.js';
+import { profile } from './profile.js';
 import { generateCoaching, hasApiKey, readCachedCoaching, writeCachedCoaching } from './coach.js';
 import { MOTIF_LABELS } from './motifs.js';
 import { TIME_CLASSES, type GameResult, type TimeClass } from './types.js';
@@ -158,6 +159,13 @@ export function createApi(db: DB, pool: EnginePool): Router {
     const player = findPlayer(db, req.params.username);
     if (!player) return res.status(404).json({ error: 'No such player' });
     res.json({ player, ...dashboard(db, player.id, parseScope(req.query.scope) ?? 'all') });
+  });
+
+  router.get('/players/:username/profile', (req, res) => {
+    const player = findPlayer(db, req.params.username);
+    if (!player) return res.status(404).json({ error: 'No such player' });
+    const scope = parseScope(req.query.scope) ?? 'all';
+    res.json({ scope, profile: profile(db, player.id, scope) });
   });
 
   router.get('/players/:username/patterns', (req, res) => {

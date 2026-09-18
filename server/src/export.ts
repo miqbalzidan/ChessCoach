@@ -19,6 +19,7 @@ import { getDb, getSetting, type DB } from './db.js';
 import { findPlayer, getMoves, listGames } from './store.js';
 import { dashboard } from './stats.js';
 import { detectPatterns } from './patterns.js';
+import { profile } from './profile.js';
 import { MOTIF_LABELS } from './motifs.js';
 import { generateCoaching, readCachedCoaching, writeCachedCoaching } from './coach.js';
 
@@ -76,6 +77,7 @@ export async function buildSnapshot(
       patterns: patterns as SnapshotScope['patterns'],
       labels: MOTIF_LABELS,
       coaching: coaching as SnapshotScope['coaching'],
+      profile: profile(db, player.id, scope) as SnapshotScope['profile'],
     };
     note(`${scope}: ${patterns.length} patterns`);
   }

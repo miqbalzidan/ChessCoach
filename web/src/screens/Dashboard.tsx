@@ -4,7 +4,14 @@ import { api, ApiError } from '../api';
 import { BaselineBars } from '../components/BaselineBars';
 import { Empty, ErrorNote, Loading, TimeClassBand } from '../components/Chrome';
 import { pluralise, relativeTime, scopeLabel, signed } from '../format';
-import type { Coaching, Dashboard as DashboardData, Pattern, Scope } from '../types';
+import type {
+  Coaching,
+  Dashboard as DashboardData,
+  Pattern,
+  Profile,
+  Scope,
+  Trait,
+} from '../types';
 
 export function Dashboard({
   username,
@@ -21,6 +28,7 @@ export function Dashboard({
   const [data, setData] = useState<DashboardData | null>(null);
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [coaching, setCoaching] = useState<Coaching | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,11 +38,16 @@ export function Dashboard({
     setLoading(true);
     setError(null);
 
-    Promise.all([api.dashboard(username, scope), api.patterns(username, scope)])
-      .then(([dashboard, patternResponse]) => {
+    Promise.all([
+      api.dashboard(username, scope),
+      api.patterns(username, scope),
+      api.profile(username, scope).catch(() => null),
+    ])
+      .then(([dashboard, patternResponse, profileResponse]) => {
         if (cancelled) return;
         setData(dashboard);
         setPatterns(patternResponse.patterns);
+        setProfile(profileResponse?.profile ?? null);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof ApiError ? err.message : 'Could not load the sheet');
@@ -330,7 +343,103 @@ export function Dashboard({
           )}
         </aside>
       </div>
+
+      <ScoutingReport profile={profile} />
     </>
+  );
+}
+
+/**
+ * The same evidence read the other way round: not "what did I get wrong" but "what
+ * would someone do to beat me". Strengths are here because a sheet that only ever
+ * lists faults stops being read — and because knowing what holds up is how you know
+ * what to trade into.
+ */
+function ScoutingReport({ profile }: { profile: Profile | null }) {
+  if (!profile) return null;
+
+  if (profile.thin) {
+    return (
+      <div className="scout">
+        <div className="section-head">
+          <div className="label">scouting report</div>
+          <div className="meta">{pluralise(profile.games, 'game')}</div>
+        </div>
+        <div className="prose scout-thin">
+          Not enough games in this segment to say anything worth acting on. A profile
+          drawn from a handful of games mostly describes the handful.
+        </div>
+      </div>
+    );
+  }
+
+  if (profile.strengths.length === 0 && profile.weaknesses.length === 0) {
+    return (
+      <div className="scout">
+        <div className="section-head">
+          <div className="label">scouting report</div>
+          <div className="meta">{pluralise(profile.games, 'game')}</div>
+        </div>
+        <div className="prose scout-thin">
+          Nothing stands out either way — you play your field about evenly across
+          phases, openings and the clock.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="scout">
+      <div className="section-head">
+        <div className="label">scouting report · how they beat you</div>
+        <div className="meta">drawn from {pluralise(profile.games, 'analysed game')}</div>
+      </div>
+
+      <div className="scout-grid">
+        <TraitColumn
+          heading="what holds up"
+          empty="Nothing separates you from your field yet."
+          traits={profile.strengths}
+          kind="strength"
+        />
+        <TraitColumn
+          heading="what to aim at"
+          empty="No clear way in — which is its own kind of good news."
+          traits={profile.weaknesses}
+          kind="weakness"
+        />
+      </div>
+    </div>
+  );
+}
+
+function TraitColumn({
+  heading,
+  empty,
+  traits,
+  kind,
+}: {
+  heading: string;
+  empty: string;
+  traits: Trait[];
+  kind: 'strength' | 'weakness';
+}) {
+  return (
+    <div>
+      <div className={`scout-heading scout-heading-${kind}`}>{heading}</div>
+      {traits.length === 0 ? (
+        <div className="prose scout-thin">{empty}</div>
+      ) : (
+        traits.map((trait) => (
+          <div key={trait.key} className={`trait trait-${kind}`}>
+            <div className="trait-title">{trait.title}</div>
+            <div className="prose trait-detail">{trait.detail}</div>
+            {/* The number that produced the claim, never far from it. */}
+            <div className="trait-evidence numeric">{trait.evidence}</div>
+          </div>
+        ))
+      )}
+    </div>
   );
 }
 

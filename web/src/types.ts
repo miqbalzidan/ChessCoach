@@ -242,6 +242,23 @@ export interface Settings {
   players: Player[];
 }
 
+export interface Trait {
+  key: string;
+  title: string;
+  detail: string;
+  /** The measurement behind the claim, shown beside it. */
+  evidence: string;
+  weight: number;
+}
+
+export interface Profile {
+  strengths: Trait[];
+  weaknesses: Trait[];
+  games: number;
+  /** Too few games to say anything responsibly. */
+  thin: boolean;
+}
+
 /* ---------- snapshot ----------
    A snapshot is the whole leak sheet frozen at a moment: everything the read-only
    screens ask for, already computed. The phone has no engine and no database, so
@@ -261,6 +278,7 @@ export interface SnapshotScope {
   labels: Record<string, string>;
   /** Null when a scope has no games worth coaching on. */
   coaching: Coaching | null;
+  profile: Profile;
 }
 
 export interface Snapshot {

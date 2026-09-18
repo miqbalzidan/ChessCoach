@@ -968,6 +968,73 @@ a {
   }
 }
 
+/* ---------- scouting report ---------- */
+
+.scout {
+  margin-top: 8px;
+}
+
+.scout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--margin);
+  margin: 0 var(--margin);
+}
+
+/* A rule between the columns rather than a box around each: the two readings are
+   one report, not two cards. */
+.scout-grid > * + * {
+  border-left: 1px solid var(--rule);
+  padding-left: var(--margin);
+}
+
+.scout-heading {
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ink);
+  margin-bottom: 4px;
+}
+
+.scout-heading-weakness {
+  color: var(--vermilion);
+}
+
+.trait {
+  padding: 15px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.trait-title {
+  font: 600 17px/1.25 var(--display);
+}
+
+.trait-detail {
+  margin-top: 5px;
+  max-width: 48ch;
+}
+
+.trait-evidence {
+  margin-top: 8px;
+  font: 400 11px/1.5 var(--mono);
+  color: var(--muted);
+}
+
+.trait-weakness .trait-evidence {
+  color: var(--vermilion);
+}
+
+.scout-thin {
+  margin: 0 var(--margin);
+  padding: 16px 0;
+  max-width: 60ch;
+}
+
+.scout-grid .scout-thin {
+  margin: 0;
+}
+
 /* The game's header. In the stylesheet rather than inline, because the phone
    breakpoint has to be able to stack it — an inline grid-template-columns cannot be
    overridden by a media query, and the scores would push the page sideways. */
@@ -1196,6 +1263,17 @@ a {
 
   .review-actions {
     flex-wrap: wrap;
+  }
+
+  /* The two readings stack, and the divider becomes the rule above the second. */
+  .scout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scout-grid > * + * {
+    border-left: 0;
+    padding-left: 0;
+    margin-top: 26px;
   }
 }
 

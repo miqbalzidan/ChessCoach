@@ -178,6 +178,16 @@ export function serveFromSnapshot<T>(path: string, init?: RequestInit): T {
     if (tail === 'job') return { job: null } as T;
     if (tail === 'dashboard') return snapshot.scopes[scope].dashboard as T;
 
+    if (tail === 'profile') {
+      // Older snapshots predate the scouting report; an empty one reads as "nothing
+      // to say yet" rather than breaking the screen.
+      const stored = snapshot.scopes[scope].profile;
+      return {
+        scope,
+        profile: stored ?? { strengths: [], weaknesses: [], games: 0, thin: true },
+      } as T;
+    }
+
     if (tail === 'patterns') {
       const min = Number(url.searchParams.get('min') ?? snapshot.minOccurrences);
       const { patterns, labels } = snapshot.scopes[scope];

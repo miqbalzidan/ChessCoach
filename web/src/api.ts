@@ -7,6 +7,7 @@ import type {
   Move,
   Pattern,
   Player,
+  Profile,
   Scope,
   Settings,
   TimeClass,
@@ -116,6 +117,11 @@ export const api = {
 
   dashboard: (username: string, scope: Scope) =>
     request<Dashboard>(`/players/${encodeURIComponent(username)}/dashboard?scope=${scope}`),
+
+  profile: (username: string, scope: Scope) =>
+    request<{ scope: Scope; profile: Profile }>(
+      `/players/${encodeURIComponent(username)}/profile?scope=${scope}`,
+    ),
 
   patterns: (username: string, scope: Scope, min = 3) =>
     request<{ scope: Scope; patterns: Pattern[]; labels: Record<string, string> }>(

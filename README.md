@@ -41,6 +41,8 @@ class, with a plain-language coaching layer on top.
 - A Claude-written summary of the recurring weaknesses, with a suggested follow-up
   attached to each pattern
 - A link out to a lesson for whichever motif you keep repeating
+- A scouting report: what holds up and what an opponent would aim at, measured
+  against the players you actually face rather than an absolute bar
 
 ---
 
@@ -161,6 +163,13 @@ engine move, in a position that is not already won.
 **Phase is read off the board**, not the move number: a queenless four-piece position is
 an endgame on move 18 as much as on move 60.
 
+**The scouting report compares you to your own opponents.** Everyone blunders; what
+matters is whether you blunder more than the people across the board from you. Using
+the opponents in your own games as the baseline controls for rating without having to
+know it, and the bar moves up as you improve. Below eight games in a segment the
+report declines to say anything — a profile drawn from a handful of games mostly
+describes the handful.
+
 **Rating cost is derived, not invented.** A drop in winning chances is a drop in expected
 score, and the Elo consequence of losing expected score is K times it. Chess.com uses
 K ≈ 10, so a pattern that cost you 4.1 expected points reads as −41 Elo.
@@ -176,6 +185,7 @@ server/
   evaluation.ts  Win-percentage model, accuracy, classification thresholds
   motifs.ts      Why a move lost value — the vocabulary patterns cluster on
   patterns.ts    Mistake clustering and rating cost
+  profile.ts     Strengths and weaknesses — the scouting report
   stats.ts       Dashboard aggregation, segmented by time class
   coach.ts       Claude coaching layer, with an offline fallback
   chesscom.ts    Public API client
