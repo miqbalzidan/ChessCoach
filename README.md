@@ -106,6 +106,14 @@ in the browser as WebAssembly and your games live in it. **Settings → this dev
 run everything on this device.** Nothing is uploaded and nothing needs to be switched
 on somewhere else.
 
+**Installing it.** The built site carries a service worker that precaches everything
+it needs — the app, the fonts, the SQLite build and the 1.8 MB engine, about 3.7 MB in
+all. Load it once, **Add to Home Screen**, and from then on it opens and analyses with
+no network whatsoever. Publishing is a one-off: enable **Settings → Pages → Source:
+GitHub Actions** on the repository and the workflow puts the built site up on each
+push to `main`. Until Pages is switched on that job is skipped and nothing is
+published, which is deliberate — it is your repository and your decision.
+
 **Archive on the computer, top up on the phone.** That is the shape this is built for,
 and it is worth following where you can:
 

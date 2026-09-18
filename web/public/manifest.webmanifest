@@ -2,15 +2,16 @@
   "name": "Leak Sheet — Chess Analyzer",
   "short_name": "Leak Sheet",
   "description": "What you keep getting wrong at chess, across your whole game history.",
-  "start_url": "/",
-  "scope": "/",
+  "_comment": "Every URL here is relative, and deliberately so: a manifest's URLs resolve against the manifest's own location, so the same file works served from a domain root and from a project page under /<repo>/. Absolute paths would install an app whose icon is missing and whose start_url is a 404.",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#e8e2d4",
   "theme_color": "#e8e2d4",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

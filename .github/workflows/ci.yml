@@ -57,3 +57,54 @@ jobs:
           fi
           test -f web/dist/fonts/fonts.css
           echo "fonts are self-hosted"
+
+      # The phone runs the engine itself, so a build without it is not a phone app.
+      - name: Check the built app carries its own engine
+        run: |
+          test -f web/dist/engine/stockfish-19-lite-single.wasm
+          test -f web/dist/engine/LICENSE-stockfish.txt
+          test -f web/dist/sw.js
+          grep -q "stockfish-19-lite-single.wasm" web/dist/sw.js \
+            || { echo "the service worker is not precaching the engine"; exit 1; }
+          echo "engine is vendored, licensed and precached"
+
+  # Publishing is opt-in: this job does nothing until someone enables Pages on the
+  # repository (Settings → Pages → Source: GitHub Actions). Until then it is skipped,
+  # and nothing this branch does puts a site on the internet.
+  pages:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # A project page is served from /<repo>/, not the domain root. Everything in the
+      # app builds its URLs from this — including the engine, which would otherwise
+      # look for itself at the root and find nothing.
+      - name: Build for Pages
+        run: npm run build --workspace web
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

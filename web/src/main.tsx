@@ -28,3 +28,18 @@ async function start(): Promise<void> {
 }
 
 void start();
+
+/**
+ * Installing the app, so it works with no network and no computer.
+ *
+ * Production only: a service worker in front of a dev server serves yesterday's
+ * bundle and wastes an afternoon. Registration failing is not worth surfacing — the
+ * app works either way, it just will not survive going offline.
+ */
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  addEventListener('load', () => {
+    void navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
+      .catch(() => undefined);
+  });
+}

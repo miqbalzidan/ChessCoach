@@ -1,8 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { serviceWorker } from './plugins/service-worker';
 
 export default defineConfig({
-  plugins: [react()],
+  // A project page on GitHub Pages is served under /<repo>/, not the domain root, so
+  // the base has to be settable at build time. Everything in the app derives its URLs
+  // from this — including the engine, which would otherwise look for itself at /.
+  base: process.env.BASE_PATH ?? '/',
+  plugins: [react(), serviceWorker()],
   worker: {
     // The Worker loads SQLite and the engine with dynamic `import()`, which means
     // code-splitting, which Vite's default IIFE worker output cannot do. It is also

@@ -12,8 +12,14 @@
  */
 import { QueuedEnginePool, UciEngine, type EnginePool } from '../../../core/src/engine.js';
 
-/** Where the vendored build lives, relative to the site root. */
-const ENGINE_URL = '/engine/stockfish-19-lite-single.js';
+/**
+ * Where the vendored build lives.
+ *
+ * Built from `BASE_URL` rather than written as `/engine/…`: published under a path
+ * — a project page at `/ChessCoach/`, say — an absolute URL would point at the
+ * domain root and fetch nothing.
+ */
+const ENGINE_URL = `${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`;
 
 /**
  * A phone has few cores and throttles when warm, so the pool is small. Two engines
