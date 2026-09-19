@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Publishing by hand, from the Actions tab. Merging to `main` publishes on its own,
+  # but that ties "put a site up" to "land the branch", and the first publish usually
+  # wants to happen before that — to check the thing installs on a real phone.
+  workflow_dispatch:
+
+# A new push makes the previous run's answer irrelevant, so stop paying for it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # better-sqlite3@13 declares engines >=22 and its native module segfaults
+        # on 20, so 22 is the real floor — and the floor is the version worth
+        # testing, since it is the one that breaks first.
+        node: ['22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # The analysis tests run a real engine — they play the Opera Game and assert
+      # the app calls 13.Rxd7 brilliant. Without a binary they do not skip, they fail.
+      - name: Install Stockfish
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends stockfish
+          ls -l /usr/games/stockfish
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - run: npm run build
+
+      # The whole point of an export is that it needs nothing, so a build that has
+      # gone back to fetching fonts from a CDN is a regression worth failing on.
+      - name: Check the built app carries its own fonts
+        run: |
+          if grep -q "fonts.googleapis.com" web/dist/index.html; then
+            echo "web/dist/index.html still references Google Fonts."
+            echo "Snapshots must render with no network — run 'npm run fonts'."
+            exit 1
+          fi
+          test -f web/dist/fonts/fonts.css
+          echo "fonts are self-hosted"
+
+      # The phone runs the engine itself, so a build without it is not a phone app.
+      - name: Check the built app carries its own engine
+        run: |
+          test -f web/dist/engine/stockfish-19-lite-single.wasm
+          test -f web/dist/engine/LICENSE-stockfish.txt
+          test -f web/dist/sw.js
+          grep -q "stockfish-19-lite-single.wasm" web/dist/sw.js \
+            || { echo "the service worker is not precaching the engine"; exit 1; }
+          echo "engine is vendored, licensed and precached"
+
+  # Publishing is opt-in: this job does nothing until someone enables Pages on the
+  # repository (Settings → Pages → Source: GitHub Actions). Until then it is skipped,
+  # and nothing this branch does puts a site on the internet.
+  #
+  # Two ways in: landing on `main`, or running this workflow by hand against any
+  # branch. The manual route is what makes the first publish possible without
+  # merging first — and a site you cannot put up until you have merged is a site
+  # you cannot test on a phone before you merge.
+  pages:
+    needs: check
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # A project page is served from /<repo>/, not the domain root. Everything in the
+      # app builds its URLs from this — including the engine, which would otherwise
+      # look for itself at the root and find nothing.
+      - name: Build for Pages
+        run: npm run build --workspace web
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

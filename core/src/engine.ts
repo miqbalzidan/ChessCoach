@@ -1,25 +1,22 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { cpus } from 'node:os';
-import { EventEmitter } from 'node:events';
+/**
+ * Talking UCI, without caring what is on the other end of the wire.
+ *
+ * Stockfish speaks the same line-oriented text protocol whether it is a native
+ * process on a server reading stdin, or a WASM build in a phone's browser taking
+ * `postMessage`. The protocol is the interesting part and the transport is not, so
+ * the protocol lives here and each host brings its own pipe: it hands `UciEngine` a
+ * `send` function, and feeds whatever comes back to `receive`.
+ *
+ * `EnginePool` is here for the same reason. Analysis is embarrassingly parallel
+ * across positions, so throughput comes from running several engines off one queue —
+ * which is arithmetic, not I/O, and does not need rewriting per platform.
+ */
 import type { EngineLine, Score } from './types.js';
 
-const CANDIDATE_PATHS = [
-  process.env.STOCKFISH_PATH,
-  '/usr/games/stockfish',
-  '/usr/local/bin/stockfish',
-  '/opt/homebrew/bin/stockfish',
-  'stockfish',
-].filter((p): p is string => Boolean(p));
+export type { EngineLine, Score };
 
-export function resolveStockfishPath(): string {
-  for (const candidate of CANDIDATE_PATHS) {
-    if (candidate === 'stockfish' || existsSync(candidate)) return candidate;
-  }
-  throw new Error(
-    'Stockfish not found. Install it (apt install stockfish / brew install stockfish) or set STOCKFISH_PATH.',
-  );
-}
+/** What a host must provide: a way to send one UCI command. */
+export type SendCommand = (command: string) => void;
 
 interface PendingSearch {
   resolve: (lines: EngineLine[]) => void;
@@ -28,49 +25,26 @@ interface PendingSearch {
   lines: Map<number, EngineLine>;
 }
 
-/** One long-lived UCI process. Commands are serialised by the pool that owns it. */
-class Engine extends EventEmitter {
-  private proc: ChildProcessWithoutNullStreams;
-  private buffer = '';
+/**
+ * One engine, mid-conversation. Commands are serialised by the pool that owns it —
+ * a second search before the first resolves is a programming error, not a queue.
+ */
+export class UciEngine {
   private pending: PendingSearch | null = null;
-  private readyWaiters: Array<() => void> = [];
+  private readyWaiters: Array<{ resolve: () => void; reject: (err: Error) => void }> = [];
   private currentMultipv = 0;
   name = 'stockfish';
 
-  constructor(binary: string, hashMb: number, threads: number) {
-    super();
-    this.proc = spawn(binary, [], { stdio: 'pipe' });
-    this.proc.stdout.setEncoding('utf8');
-    this.proc.stdout.on('data', (chunk: string) => this.onData(chunk));
-    this.proc.on('error', (err) => this.failPending(err));
-    this.proc.on('exit', () => this.failPending(new Error('Stockfish exited unexpectedly')));
-    this.send('uci');
-    this.send(`setoption name Hash value ${hashMb}`);
-    this.send(`setoption name Threads value ${threads}`);
-  }
+  constructor(private readonly send: SendCommand) {}
 
-  private send(cmd: string): void {
-    this.proc.stdin.write(`${cmd}\n`);
-  }
-
-  private onData(chunk: string): void {
-    this.buffer += chunk;
-    let index: number;
-    while ((index = this.buffer.indexOf('\n')) >= 0) {
-      const line = this.buffer.slice(0, index).trimEnd();
-      this.buffer = this.buffer.slice(index + 1);
-      if (line) this.onLine(line);
-    }
-  }
-
-  private onLine(line: string): void {
+  /** Feed one line of engine output. Partial lines are the transport's problem. */
+  receive(line: string): void {
     if (line.startsWith('id name ')) {
       this.name = line.slice('id name '.length).trim();
       return;
     }
     if (line === 'readyok') {
-      const waiter = this.readyWaiters.shift();
-      waiter?.();
+      this.readyWaiters.shift()?.resolve();
       return;
     }
     if (!this.pending) return;
@@ -83,22 +57,29 @@ class Engine extends EventEmitter {
     if (line.startsWith('bestmove')) {
       const pending = this.pending;
       this.pending = null;
-      const ordered = [...pending.lines.entries()]
-        .sort((a, b) => a[0] - b[0])
-        .map(([, l]) => l);
+      const ordered = [...pending.lines.entries()].sort((a, b) => a[0] - b[0]).map(([, l]) => l);
       pending.resolve(ordered);
     }
   }
 
-  private failPending(err: Error): void {
+  /**
+   * Something went wrong with the transport. A dead engine will never send
+   * `readyok`, so without this every waiter hangs forever instead of surfacing as
+   * an import error.
+   */
+  fail(err: Error): void {
     const pending = this.pending;
     this.pending = null;
     pending?.reject(err);
+
+    const waiters = this.readyWaiters;
+    this.readyWaiters = [];
+    for (const waiter of waiters) waiter.reject(err);
   }
 
   private ready(): Promise<void> {
-    return new Promise((resolve) => {
-      this.readyWaiters.push(resolve);
+    return new Promise((resolve, reject) => {
+      this.readyWaiters.push({ resolve, reject });
       this.send('isready');
     });
   }
@@ -122,13 +103,18 @@ class Engine extends EventEmitter {
     await this.ready();
   }
 
+  configure(hashMb: number, threads: number): void {
+    this.send('uci');
+    this.send(`setoption name Hash value ${hashMb}`);
+    this.send(`setoption name Threads value ${threads}`);
+  }
+
   quit(): void {
     this.send('quit');
-    this.proc.kill();
   }
 }
 
-function parseInfoLine(line: string): { multipv: number; line: EngineLine } | null {
+export function parseInfoLine(line: string): { multipv: number; line: EngineLine } | null {
   const tokens = line.split(' ');
   let depth = 0;
   let multipv = 1;
@@ -163,23 +149,26 @@ interface Job {
 }
 
 /**
- * A fixed set of engine processes fed from one queue. Analysis is embarrassingly
- * parallel across positions, so throughput scales with processes rather than with
- * Stockfish's own threading, which stalls on short fixed-depth searches.
+ * What the analysis asks of an engine, and the whole of it. Anything satisfying
+ * this can drive the app — which is how the same analysis runs against a native
+ * process and against a WASM build without knowing which it has.
  */
-export class EnginePool {
-  private engines: Engine[] = [];
-  private idle: Engine[] = [];
+export interface EnginePool {
+  readonly engineName: string;
+  readonly size: number;
+  search(fen: string, depth: number, multipv?: number): Promise<EngineLine[]>;
+  ready(): Promise<void>;
+  close(): void;
+}
+
+/** A fixed set of engines fed from one queue. */
+export class QueuedEnginePool implements EnginePool {
+  private idle: UciEngine[] = [];
   private queue: Job[] = [];
   private closed = false;
 
-  constructor(size = defaultPoolSize(), hashMb = 64, threads = 1) {
-    const binary = resolveStockfishPath();
-    for (let i = 0; i < size; i += 1) {
-      const engine = new Engine(binary, hashMb, threads);
-      this.engines.push(engine);
-      this.idle.push(engine);
-    }
+  constructor(private engines: UciEngine[]) {
+    this.idle = [...engines];
   }
 
   get engineName(): string {
@@ -223,10 +212,4 @@ export class EnginePool {
     this.engines = [];
     this.idle = [];
   }
-}
-
-function defaultPoolSize(): number {
-  const configured = Number(process.env.ENGINE_POOL_SIZE);
-  if (Number.isFinite(configured) && configured > 0) return Math.floor(configured);
-  return Math.max(1, Math.min(6, cpus().length - 1));
 }

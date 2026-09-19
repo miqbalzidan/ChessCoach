@@ -4,13 +4,18 @@ import type {
   Game,
   GameResult,
   Job,
+  Lens,
   Move,
+  OpeningRow,
   Pattern,
   Player,
+  Profile,
   Scope,
   Settings,
   TimeClass,
 } from './types';
+import { inSnapshotMode, serveFromSnapshot, SnapshotError } from './snapshot';
+import { inLocalMode, LocalError, requestLocal } from './engine/local';
 
 const BASE = '/api';
 
@@ -24,7 +29,38 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The one place that decides where an answer comes from.
+ *
+ * Three backends now, and every screen above this line is unchanged — they call the
+ * same api.* methods and never learn which one served them:
+ *
+ *   a server,   over HTTP, when there is one;
+ *   a snapshot, from a frozen file, which can only be read;
+ *   this device, from a Worker holding the database and the engine.
+ *
+ * A snapshot wins over local mode: if you opened an exported sheet, that is the sheet
+ * you meant to look at, whatever else this browser has stored.
+ */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (inSnapshotMode()) {
+    try {
+      return serveFromSnapshot<T>(path, init);
+    } catch (error) {
+      if (error instanceof SnapshotError) throw new ApiError(error.message, error.status);
+      throw error;
+    }
+  }
+
+  if (inLocalMode()) {
+    try {
+      return await requestLocal<T>(path, init);
+    } catch (error) {
+      if (error instanceof LocalError) throw new ApiError(error.message, error.status);
+      throw error;
+    }
+  }
+
   const response = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -46,6 +82,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 function post<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, { method: 'POST', body: JSON.stringify(body) });
+}
+
+/** The lens as the read endpoints take it. Colour only travels with an opening. */
+function lensQuery(lens: Lens, extra: Record<string, string> = {}): string {
+  const query = new URLSearchParams({ scope: lens.scope, ...extra });
+  if (lens.eco) {
+    query.set('eco', lens.eco);
+    if (lens.color) query.set('color', lens.color);
+  }
+  return query.toString();
 }
 
 export const api = {
@@ -83,6 +129,8 @@ export const api = {
     params: {
       timeClass?: Scope;
       result?: GameResult | 'all';
+      eco?: string;
+      color?: 'white' | 'black';
       opponent?: string;
       limit?: number;
       offset?: number;
@@ -102,17 +150,28 @@ export const api = {
 
   analyseGame: (id: number) => post<{ game: Game; moves: Move[] }>(`/games/${id}/analyse`, {}),
 
-  dashboard: (username: string, scope: Scope) =>
-    request<Dashboard>(`/players/${encodeURIComponent(username)}/dashboard?scope=${scope}`),
+  dashboard: (username: string, lens: Lens) =>
+    request<Dashboard>(`/players/${encodeURIComponent(username)}/dashboard?${lensQuery(lens)}`),
 
-  patterns: (username: string, scope: Scope, min = 3) =>
-    request<{ scope: Scope; patterns: Pattern[]; labels: Record<string, string> }>(
-      `/players/${encodeURIComponent(username)}/patterns?scope=${scope}&min=${min}`,
+  profile: (username: string, lens: Lens) =>
+    request<{ scope: Scope; lens: Lens; profile: Profile }>(
+      `/players/${encodeURIComponent(username)}/profile?${lensQuery(lens)}`,
     ),
 
-  coaching: (username: string, scope: Scope, refresh = false) =>
-    request<{ scope: Scope; coaching: Coaching; cached: boolean }>(
-      `/players/${encodeURIComponent(username)}/coaching?scope=${scope}&refresh=${refresh}`,
+  /** The openings this player has a real sample of, for the filter to offer. */
+  openings: (username: string, scope: Scope) =>
+    request<{ scope: Scope; openings: OpeningRow[] }>(
+      `/players/${encodeURIComponent(username)}/openings?scope=${scope}`,
+    ),
+
+  patterns: (username: string, lens: Lens, min = 3) =>
+    request<{ scope: Scope; lens: Lens; patterns: Pattern[]; labels: Record<string, string> }>(
+      `/players/${encodeURIComponent(username)}/patterns?${lensQuery(lens, { min: String(min) })}`,
+    ),
+
+  coaching: (username: string, lens: Lens, refresh = false) =>
+    request<{ scope: Scope; lens: Lens; coaching: Coaching; cached: boolean }>(
+      `/players/${encodeURIComponent(username)}/coaching?${lensQuery(lens, { refresh: String(refresh) })}`,
     ),
 
   settings: () => request<Settings>('/settings'),

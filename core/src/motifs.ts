@@ -132,7 +132,7 @@ function detectMissedWins(input: MotifInput, motifs: Set<string>): void {
 function hangsMaterial(
   after: Chess,
   mover: ChessColor,
-  opponent: ChessColor,
+  _opponent: ChessColor,
   played: Move,
   refutation: Move | null,
 ): boolean {
@@ -216,7 +216,7 @@ function createsPin(after: Chess, refutation: Move, by: ChessColor): boolean {
 }
 
 function losesMaterialOnTrade(
-  before: Chess,
+  _before: Chess,
   after: Chess,
   played: Move,
   mover: ChessColor,

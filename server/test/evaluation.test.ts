@@ -9,7 +9,7 @@ import {
   scoreToCp,
   winPercent,
   MATE_CP,
-} from '../src/evaluation.ts';
+} from '../../core/src/evaluation.ts';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 

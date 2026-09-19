@@ -1,20 +1,34 @@
-import Database from 'better-sqlite3';
-import { mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+/**
+ * The database, as the rest of the code needs it to be.
+ *
+ * Nothing here knows whether SQLite is a native binding on a server or a WASM build
+ * in a phone's browser. Both satisfy this interface, so the schema, the migration and
+ * every query in this workspace are written once and run in both places.
+ *
+ * The surface is deliberately tiny — it is exactly what the queries below use, which
+ * is what makes a second implementation a day's work rather than a rewrite.
+ */
 
-export type DB = Database.Database;
+/** What a write reports back. Both SQLite bindings supply these; the inserts rely
+ *  on them to return the new row's id. */
+export interface RunResult {
+  changes: number;
+  lastInsertRowid: number | bigint;
+}
 
-let instance: DB | null = null;
+/** A prepared statement, bound by position (`?`) or by name (`@player`). */
+export interface Statement {
+  get(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+  run(...params: unknown[]): RunResult;
+}
 
-export function getDb(): DB {
-  if (instance) return instance;
-  const file = resolve(process.env.DATABASE_PATH ?? 'data/chesscoach.db');
-  mkdirSync(dirname(file), { recursive: true });
-  instance = new Database(file);
-  instance.pragma('journal_mode = WAL');
-  instance.pragma('foreign_keys = ON');
-  migrate(instance);
-  return instance;
+export interface DB {
+  prepare(sql: string): Statement;
+  exec(sql: string): unknown;
+  close(): unknown;
+  /** Wraps a function so every write inside it commits or rolls back together. */
+  transaction<Args extends unknown[]>(fn: (...args: Args) => void): (...args: Args) => void;
 }
 
 export function migrate(db: DB): void {
@@ -114,11 +128,11 @@ export function migrate(db: DB): void {
     CREATE TABLE IF NOT EXISTS coaching (
       id         INTEGER PRIMARY KEY,
       player_id  INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-      scope      TEXT NOT NULL,
+      lens       TEXT NOT NULL,
       body       TEXT NOT NULL,
       model      TEXT NOT NULL,
       created_at INTEGER NOT NULL,
-      UNIQUE (player_id, scope)
+      UNIQUE (player_id, lens)
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -126,6 +140,16 @@ export function migrate(db: DB): void {
       value TEXT NOT NULL
     );
   `);
+
+  // Coaching used to be cached per time class; it is now cached per lens, which is a
+  // time class and optionally an opening. Every existing row is already a valid lens
+  // key — an unfiltered lens keys as its bare scope — so this only renames the column.
+  const coachingColumns = db.prepare('PRAGMA table_info(coaching)').all() as Array<{
+    name: string;
+  }>;
+  if (coachingColumns.some((column) => column.name === 'scope')) {
+    db.exec('ALTER TABLE coaching RENAME COLUMN scope TO lens');
+  }
 }
 
 export function getSetting(db: DB, key: string, fallback: string): string {

@@ -2,6 +2,34 @@ export type TimeClass = 'bullet' | 'blitz' | 'rapid' | 'daily';
 
 export const TIME_CLASSES: TimeClass[] = ['bullet', 'blitz', 'rapid', 'daily'];
 
+export type Scope = TimeClass | 'all';
+
+/* ---------- the lens ----------
+   What the whole sheet is narrowed to. Time class was the only lens for a long
+   while; an opening is a second one, and the two compose — "the Berlin as Black,
+   in blitz" is a question the stored analysis can already answer.
+
+   Everything downstream takes a Lens rather than a Scope, so a report cannot be
+   computed for one narrowing and labelled with another. */
+
+export interface Lens {
+  scope: Scope;
+  /** ECO code, e.g. C65. Absent means every opening. */
+  eco?: string | null;
+  /** Which side the player had. Absent means both. */
+  color?: 'white' | 'black' | null;
+}
+
+/**
+ * One stable string per lens — the coaching cache key, the snapshot key, and the
+ * effect dependency on the client. An unfiltered lens keys as its bare scope, so
+ * `all` and `blitz` mean exactly what they always did.
+ */
+export function lensKey(lens: Lens): string {
+  if (!lens.eco) return lens.scope;
+  return lens.color ? `${lens.scope}:${lens.eco}:${lens.color}` : `${lens.scope}:${lens.eco}`;
+}
+
 export type Color = 'white' | 'black';
 
 export type GameResult = 'win' | 'loss' | 'draw';

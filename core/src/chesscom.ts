@@ -1,21 +1,37 @@
 import { parsePgn } from './analysis.js';
 import { TIME_CLASSES, type ImportedGame, type TimeClass } from './types.js';
 
-const API_BASE = process.env.CHESSCOM_API_BASE ?? 'https://api.chess.com/pub';
+let API_BASE = 'https://api.chess.com/pub';
 
 /**
- * Chess.com rejects requests without a descriptive User-Agent, and asks that
- * tools identify themselves so they can be contacted about traffic.
+ * Chess.com rejects requests without a descriptive User-Agent, and asks that tools
+ * identify themselves so they can be contacted about traffic.
+ *
+ * A browser will not let us send one: User-Agent is a forbidden header name, so the
+ * fetch below silently drops it there. That is why this is configuration rather than
+ * a constant — a host that cannot set it says so, and the caller can decide what to
+ * do about a request Chess.com may refuse.
  */
-const USER_AGENT =
-  process.env.CHESSCOM_USER_AGENT ?? 'ChessCoach/0.1 (personal game analysis; +https://github.com/)';
+let userAgent = 'ChessCoach/0.1 (personal game analysis; +https://github.com/)';
+
+export interface ChessComConfig {
+  apiBase?: string;
+  userAgent?: string;
+}
+
+export function configureChessCom(config: ChessComConfig): void {
+  if (config.apiBase) API_BASE = config.apiBase;
+  if (config.userAgent) userAgent = config.userAgent;
+}
 
 export class ChessComError extends Error {
   constructor(
     message: string,
+    /** HTTP status, or 0 when the request never got one. */
     readonly status: number,
+    options?: { cause?: unknown },
   ) {
-    super(message);
+    super(message, options);
     this.name = 'ChessComError';
   }
 }
@@ -34,9 +50,28 @@ interface RawPlayerGame {
 }
 
 async function request<T>(url: string, attempt = 0): Promise<T> {
-  const response = await fetch(url, {
-    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-  });
+  // A browser forbids setting User-Agent and drops it silently, so it is only sent
+  // where it can be. Chess.com asks tools to identify themselves; a host that cannot
+  // says so by configuring it empty rather than pretending.
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (userAgent) headers['User-Agent'] = userAgent;
+
+  let response: Response;
+  try {
+    response = await fetch(url, { headers });
+  } catch (error) {
+    // `fetch` rejects rather than returning a status when the request never left, or
+    // when the browser refuses the response for want of CORS headers. The two are
+    // indistinguishable from here by design — the browser will not say which — so the
+    // message names both and points at the path that cannot be blocked.
+    throw new ChessComError(
+      'Could not reach Chess.com. It may be offline, or your browser may be blocking ' +
+        'the request — browsers can only call sites that opt in, and Chess.com may not. ' +
+        'Downloading your games from Chess.com and opening the .pgn file always works.',
+      0,
+      { cause: error },
+    );
+  }
 
   // Chess.com throttles bursts with 429; backing off is the documented remedy.
   if (response.status === 429 && attempt < 4) {
@@ -118,7 +153,7 @@ function archiveCouldContain(archiveUrl: string, since: number): boolean {
   return endOfMonth >= since;
 }
 
-export function normaliseGame(raw: RawPlayerGame, username: string): ImportedGame | null {
+export function normaliseGame(raw: RawPlayerGame, _username: string): ImportedGame | null {
   if (!raw.pgn) return null;
   // Variants share the endpoint but not the evaluation model.
   if (raw.rules && raw.rules !== 'chess') return null;

@@ -8,19 +8,25 @@ import { Library } from './screens/Library';
 import { Patterns } from './screens/Patterns';
 import { Review } from './screens/Review';
 import { Settings } from './screens/Settings';
-import type { Scope } from './types';
+import { inSnapshotMode } from './snapshot';
+import type { Lens, Scope } from './types';
 
 const ACTIVE_PLAYER_KEY = 'chesscoach.player';
 const SCOPE_KEY = 'chesscoach.scope';
 
 export function App() {
   const navigate = useNavigate();
+  const snapshot = inSnapshotMode();
   const [username, setUsername] = useState<string | null>(() =>
     localStorage.getItem(ACTIVE_PLAYER_KEY),
   );
-  const [scope, setScope] = useState<Scope>(
-    () => (localStorage.getItem(SCOPE_KEY) as Scope | null) ?? 'all',
-  );
+  // Time class is a standing preference, so it is remembered. The opening is not:
+  // it is a question you ask about one repertoire and then stop asking, and a
+  // remembered one would silently narrow a sheet you came back to days later —
+  // worse, to an opening a different player has never played.
+  const [lens, setLens] = useState<Lens>(() => ({
+    scope: (localStorage.getItem(SCOPE_KEY) as Scope | null) ?? 'all',
+  }));
   const [engine, setEngine] = useState<string>();
   const [checked, setChecked] = useState(false);
 
@@ -56,11 +62,18 @@ export function App() {
   const selectPlayer = useCallback((next: string) => {
     setUsername(next);
     localStorage.setItem(ACTIVE_PLAYER_KEY, next);
+    // Another player's openings are not this one's.
+    setLens((current) => ({ scope: current.scope }));
   }, []);
 
   const changeScope = useCallback((next: Scope) => {
-    setScope(next);
+    setLens((current) => ({ ...current, scope: next }));
     localStorage.setItem(SCOPE_KEY, next);
+  }, []);
+
+  const changeLens = useCallback((next: Lens) => {
+    setLens(next);
+    localStorage.setItem(SCOPE_KEY, next.scope);
   }, []);
 
   const onImported = useCallback(
@@ -77,13 +90,14 @@ export function App() {
         <Route
           path="/"
           element={
-            checked && !username ? (
+            checked && !username && !snapshot ? (
               <Navigate to="/import" replace />
             ) : (
               <Dashboard
                 username={username}
-                scope={scope}
+                lens={lens}
                 onScopeChange={changeScope}
+                onLensChange={changeLens}
                 engine={engine}
               />
             )
@@ -91,14 +105,31 @@ export function App() {
         />
         <Route
           path="/library"
-          element={<Library username={username} scope={scope} onScopeChange={changeScope} />}
+          element={
+            <Library
+              username={username}
+              lens={lens}
+              onScopeChange={changeScope}
+              onLensChange={changeLens}
+            />
+          }
         />
         <Route path="/review/:id" element={<Review />} />
         <Route
           path="/patterns"
-          element={<Patterns username={username} scope={scope} onScopeChange={changeScope} />}
+          element={
+            <Patterns
+              username={username}
+              lens={lens}
+              onScopeChange={changeScope}
+              onLensChange={changeLens}
+            />
+          }
         />
-        <Route path="/import" element={<Import onImported={onImported} />} />
+        <Route
+          path="/import"
+          element={snapshot ? <Navigate to="/" replace /> : <Import onImported={onImported} />}
+        />
         <Route
           path="/settings"
           element={

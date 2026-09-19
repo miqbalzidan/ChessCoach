@@ -2,14 +2,15 @@
   "name": "chesscoach",
   "private": true,
   "version": "0.1.0",
-  "description": "Longitudinal chess improvement — imports your Chess.com games, analyses every move with Stockfish, and surfaces the mistakes you keep repeating.",
+  "description": "Longitudinal chess improvement \u2014 imports your Chess.com games, analyses every move with Stockfish, and surfaces the mistakes you keep repeating.",
   "type": "module",
   "workspaces": [
+    "core",
     "server",
     "web"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "concurrently -n server,web -c magenta,cyan \"npm:dev:server\" \"npm:dev:web\"",
@@ -18,7 +19,10 @@
     "build": "npm run build --workspace server && npm run build --workspace web",
     "start": "npm run start --workspace server",
     "test": "npm run test --workspace server",
-    "typecheck": "npm run typecheck --workspace server && npm run typecheck --workspace web"
+    "typecheck": "npm run typecheck --workspace core && npm run typecheck --workspace server && npm run typecheck --workspace web",
+    "export": "npm run export --workspace server",
+    "fonts": "node scripts/fetch-fonts.mjs",
+    "engine": "node scripts/fetch-engine.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

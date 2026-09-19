@@ -1,11 +1,11 @@
 import { Chess } from 'chess.js';
-import { getDb } from './db.js';
-import { EnginePool } from './engine.js';
-import { analysePending } from './importer.js';
-import { createJob } from './importer.js';
-import { insertGame, upsertPlayer } from './store.js';
-import { applyUci } from './motifs.js';
-import type { ImportedGame, TimeClass } from './types.js';
+import { getDb } from './db-node.js';
+import { createEnginePool, type EnginePool } from './engine-node.js';
+import { analysePending } from '../../core/src/importer.js';
+import { createJob } from '../../core/src/importer.js';
+import { insertGame, upsertPlayer } from '../../core/src/store.js';
+import { applyUci } from '../../core/src/motifs.js';
+import type { ImportedGame, TimeClass } from '../../core/src/types.js';
 
 /**
  * Generates a demo history by having Stockfish play against a deliberately
@@ -421,7 +421,7 @@ async function main(): Promise<void> {
   const depth = Number(process.env.SEED_DEPTH ?? 14);
 
   const db = getDb();
-  const pool = new EnginePool();
+  const pool = createEnginePool();
   const started = Date.now();
 
   console.log(`Generating ${count} games for ${username} (engine ${pool.engineName} × ${pool.size})`);

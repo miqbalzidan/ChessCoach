@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api';
 import { ErrorNote, Loading } from '../components/Chrome';
 import { relativeTime } from '../format';
+import { inSnapshotMode } from '../snapshot';
+import { SnapshotSettings } from './SnapshotSettings';
+import { LocalDevice } from './LocalDevice';
 import type { Job, Settings as SettingsData } from '../types';
 
 export function Settings({
@@ -13,6 +16,10 @@ export function Settings({
   onSelect: (username: string) => void;
   onChanged: () => void;
 }) {
+  // A snapshot has no server to configure, so this screen becomes an account of the
+  // file instead. Declared before the effects below so none of them ever run.
+  const snapshot = inSnapshotMode();
+
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [depth, setDepth] = useState(16);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +27,7 @@ export function Settings({
   const [job, setJob] = useState<Job | null>(null);
 
   useEffect(() => {
+    if (snapshot) return;
     api
       .settings()
       .then((data) => {
@@ -29,7 +37,7 @@ export function Settings({
       .catch((err: unknown) =>
         setError(err instanceof ApiError ? err.message : 'Could not load settings'),
       );
-  }, []);
+  }, [snapshot]);
 
   useEffect(() => {
     if (!job || job.status === 'done' || job.status === 'error') return;
@@ -45,8 +53,20 @@ export function Settings({
     return () => window.clearInterval(timer);
   }, [job, onChanged]);
 
-  if (error) return <ErrorNote error={error} />;
-  if (!settings) return <Loading label="loading settings" />;
+  if (snapshot) return <SnapshotSettings />;
+
+  // Not an early return, deliberately. Someone with no server reaches this screen
+  // precisely because there is no server — and the control that frees them from
+  // needing one is on it. Hiding the whole page behind the failed request would put
+  // the way out behind the problem.
+  if (error || !settings) {
+    return (
+      <>
+        {error ? <ErrorNote error={error} /> : <Loading label="loading settings" />}
+        <LocalDevice onSeeded={onChanged} />
+      </>
+    );
+  }
 
   const saveDepth = async (next: number) => {
     setDepth(next);
@@ -217,6 +237,8 @@ export function Settings({
             ? 'Claude is writing the plain-language summaries. Set COACH_MODEL to change the model.'
             : 'No ANTHROPIC_API_KEY is set, so summaries come from the offline summariser — the same numbers, fewer words. Set the key and restart the server to switch it on.'}
         </div>
+
+        <LocalDevice onSeeded={onChanged} />
       </div>
     </>
   );

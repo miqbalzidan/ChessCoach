@@ -19,6 +19,11 @@ class, with a plain-language coaching layer on top.
 - Per-move classification: brilliant · best · excellent · good · inaccuracy · mistake · blunder
 - Per-game accuracy for both sides
 - Board replay with an eval bar, the move played and the move the engine wanted
+- Both players' names, ratings and accuracy either side of the board
+- Pieces slide, and moves, captures and checks each sound different — synthesised in
+  the browser, so no audio files and nothing to download
+- Right-click a square to highlight it, right-drag for an arrow, left-click to clear
+- A link straight to the game's analysis board on Chess.com when it came from there
 
 **V2 — cross-game statistics**
 
@@ -27,6 +32,12 @@ class, with a plain-language coaching layer on top.
 - Time-class segmentation (all / bullet / blitz / rapid / daily) filtering every stat
 - Mistake breakdown by phase (opening / middlegame / endgame)
 - Win rate by opening, from the ECO codes in the PGN
+- **Filter the whole sheet by opening** — pick one from the openings table, or from
+  the band under the time-class rule, and every number on every screen is recomputed
+  inside it: the patterns, the phases, the clock, the scouting report, the game list.
+  Openings are held per side, because the Berlin as White and the Berlin as Black are
+  different problems. The two lenses compose, so "my Sicilian in blitz" is a question
+  you can ask.
 
 **V3 — pattern detection and coaching**
 
@@ -35,12 +46,15 @@ class, with a plain-language coaching layer on top.
 - Clock-pressure correlation from the `[%clk]` data in live games
 - A Claude-written summary of the recurring weaknesses, with a suggested follow-up
   attached to each pattern
+- A link out to a lesson for whichever motif you keep repeating
+- A scouting report: what holds up and what an opponent would aim at, measured
+  against the players you actually face rather than an absolute bar
 
 ---
 
 ## Running it
 
-Requires Node 20+ and a Stockfish binary.
+Requires Node 22+ (better-sqlite3 needs it) and a Stockfish binary.
 
 ```bash
 # Stockfish
@@ -51,6 +65,126 @@ npm run dev                  # API on :8787, UI on :5173
 ```
 
 Open http://localhost:5173 and import a username.
+
+### On a phone — analyse on the computer, read anywhere
+
+The engine is a native Stockfish process and the database is a file on disk, so the
+analysis stays on the computer. The results do not have to. Export a snapshot:
+
+```bash
+npm run build
+npm run export                    # → server/exports/leaksheet-<you>-<date>.html
+```
+
+That writes **one self-contained HTML file** — the whole app, every number, the board
+replay, the coaching text and the fonts, all inside it. Put it on your phone however you
+like (cable, Drive, mail it to yourself), open it, and the leak sheet is there. No server,
+no network, no install, nothing to keep running. The current 44-game database exports to
+about 1 MB.
+
+It also writes a `.leaksheet.json.gz` alongside it. That is the same data without the app
+wrapped around it: open it from **Settings → open snapshot** in an already-installed copy,
+and it is kept in IndexedDB so the phone remembers it.
+
+A snapshot is read-only by construction — importing and analysis need the engine. The
+masthead says when it was taken, so a month-old sheet is never mistaken for today's form.
+To update it, export again.
+
+The opening filter works offline too: the export writes one frozen sheet per time class
+*and* per opening, so the phone can narrow the numbers without an engine behind it.
+Settings says how many openings a file carries. That costs about 7% more — the moves are
+the bulk of a snapshot and they are shared.
+
+Two flags, both rarely needed: `--coaching` asks Claude for any lens that has not got
+coaching cached yet, and `--with-fallback` adds an uncompressed copy of the payload for
+browsers without `DecompressionStream`, which roughly quadruples the file.
+
+### No computer at all — run the whole thing on the phone
+
+If there is no computer in the picture, the phone can be the whole app: Stockfish runs
+in the browser as WebAssembly and your games live in it. **Settings → this device →
+run everything on this device.** Nothing is uploaded and nothing needs to be switched
+on somewhere else.
+
+**Installing it.** The built site carries a service worker that precaches everything
+it needs — the app, the fonts, the SQLite build and the 1.8 MB engine, about 3.7 MB in
+all. Load it once, **Add to Home Screen**, and from then on it opens and analyses with
+no network whatsoever.
+
+It has to be served over **HTTPS**. Service workers and OPFS are withheld from any
+plain `http://` origin that is not `localhost`, so an `http://` address gives you
+neither the install nor the storage — see *Reading it on the same network* below for
+what that route can and cannot do.
+
+Publishing is a one-off. **GitHub Pages is free on public repositories only**; on a
+private one it asks you to upgrade, so either make the repository public or publish
+the built site somewhere else (Cloudflare Pages, Netlify and Vercel all take a private
+repo on their free tiers — build `npm run build --workspace web`, publish `web/dist`,
+and set `BASE_PATH` to `/` for a root domain). For Pages: enable **Settings → Pages →
+Source: GitHub Actions**, then either merge to `main` or run the **CI** workflow from
+the Actions tab (**Run workflow**) to publish a branch without merging it. Until Pages
+is switched on, that job does nothing — it is your repository and your decision.
+
+**Archive on the computer, top up on the phone.** That is the shape this is built for,
+and it is worth following where you can:
+
+| | on a phone | on a computer |
+| --- | --- | --- |
+| a week's games (5) | seconds | seconds |
+| 50 games | a few minutes | under a minute |
+| a back archive (300) | the best part of an hour | a few minutes |
+
+So: analyse the archive on a computer, `npm run export`, and open the
+`.leaksheet.json.gz` under **Settings → start from a computer's export**. Those games
+arrive already analysed, at the depth the computer used — 44 games seed in about a
+second — and from then on the phone only has to keep up with what you play. Opening a
+newer export later adds just the games since.
+
+Getting games onto the phone in the first place: **open a `.pgn` file**. Chess.com
+will hand you your whole archive as a download, and the Import screen takes it without
+asking the network for anything, so nothing can block it. Importing straight from
+Chess.com by username is also offered, but a browser may not be allowed to call their
+API — if it is refused, the screen says so and points at the file.
+
+With no computer anywhere, import on the phone anyway. Before starting anything long
+the app says how long it will take, measured on that handset rather than guessed, and
+the analysis is resumable — leave and come back and it carries on. It is a warning,
+not a refusal.
+
+The phone analyses at depth 12 rather than the desktop's 16, and with a different
+build of Stockfish. On 179 moves of real games the two agreed on every blunder and
+differed only on two borderline inaccuracies, so the leaks are the same leaks — but
+the sheet says which engine and depth produced which games rather than pretending one
+instrument measured them all.
+
+### Reading it on the same network instead
+
+If the computer is on anyway, the phone can just open it over Wi-Fi — both servers bind
+every interface and the client calls the API at a relative `/api`:
+
+```bash
+npm start                         # or: npm run dev
+hostname -I                       # macOS: ipconfig getifaddr en0
+```
+
+Then `http://<that-address>:8787` on the phone (`:5173` under `npm run dev`). Use the IP
+rather than a hostname; Vite rejects unknown hostnames unless they are in
+`server.allowedHosts`.
+
+**This route reads; it does not install.** A plain `http://` address that is not
+`localhost` is not a secure context, and browsers withhold service workers, the cache
+API and OPFS from those pages. Measured in Chromium against the built site:
+`http://<LAN IP>:5400` reports `isSecureContext: false` and has no
+`navigator.serviceWorker` and no `navigator.storage.getDirectory` at all. So there is
+nothing to install and nothing to work offline — the sheet renders, because the
+computer's server is answering, and that is the whole point of this section.
+
+It also means **"run everything on this device" over a LAN address will not keep your
+games**: with no OPFS the database falls back to memory, so an import analyses
+correctly and then vanishes on reload. The app now says so on both Settings and
+Import rather than letting you find out. For a phone that stores its own games, use an
+`https://` address — publish to Pages as above, which is the reason that section
+exists.
 
 ### No Chess.com access?
 
@@ -88,6 +222,10 @@ Everything is optional; the defaults work.
 Without an API key the app still works end to end — the coaching text is generated
 deterministically from the same numbers, in fewer words.
 
+The three typefaces are self-hosted from `web/public/fonts` (latin subsets, 224 KB over
+nine files) rather than fetched from Google, because an exported snapshot has to render
+with no network at all. `npm run fonts` regenerates them.
+
 ---
 
 ## How the analysis works
@@ -109,6 +247,13 @@ engine move, in a position that is not already won.
 **Phase is read off the board**, not the move number: a queenless four-piece position is
 an endgame on move 18 as much as on move 60.
 
+**The scouting report compares you to your own opponents.** Everyone blunders; what
+matters is whether you blunder more than the people across the board from you. Using
+the opponents in your own games as the baseline controls for rating without having to
+know it, and the bar moves up as you improve. Below eight games in a segment the
+report declines to say anything — a profile drawn from a handful of games mostly
+describes the handful.
+
 **Rating cost is derived, not invented.** A drop in winning chances is a drop in expected
 score, and the Elo consequence of losing expected score is K times it. Chess.com uses
 K ≈ 10, so a pattern that cost you 4.1 expected points reads as −41 Elo.
@@ -118,20 +263,32 @@ K ≈ 10, so a pattern that cost you 4.1 expected points reads as −41 Elo.
 ## Layout
 
 ```
-server/
-  engine.ts      Stockfish UCI process pool
+core/            No Node, no DOM — so it runs on a server or inside a phone.
+  engine.ts      UCI protocol and the engine queue, transport-agnostic
   analysis.ts    PGN → per-move evaluation, classification, clocks
   evaluation.ts  Win-percentage model, accuracy, classification thresholds
   motifs.ts      Why a move lost value — the vocabulary patterns cluster on
   patterns.ts    Mistake clustering and rating cost
-  stats.ts       Dashboard aggregation, segmented by time class
-  coach.ts       Claude coaching layer, with an offline fallback
+  profile.ts     Strengths and weaknesses — the scouting report
+  lens.ts        What a report is narrowed to: a time class, and maybe an opening
+  stats.ts       Dashboard aggregation, through a lens
+  store.ts       Every query, against core's DB interface
+  db.ts          The schema, the migration, and the interface both hosts satisfy
+  coach.ts       The brief, the offline summariser, the per-lens cache
   chesscom.ts    Public API client
+server/          What only a computer can do.
+  db-node.ts     SQLite as a native binding, in a file on disk
+  engine-node.ts Stockfish as a spawned process
+  coach-claude.ts The model call — the only part needing a key and a network
+  api.ts         HTTP routes over core
+  export.ts      Freezes a player into a portable snapshot
   seed.ts        Offline demo-history generator
 web/
   screens/       Dashboard, Library, Review, Patterns, Import, Settings
-  components/    Board, baseline bars, time-class band, masthead
+  components/    Board, baseline bars, time-class and opening bands, masthead
+  snapshot.ts    Serves the read endpoints when there is no server
   styles.css     The design system
+  public/fonts/  Self-hosted typefaces, so an export needs no network
 ```
 
 ## Tests
@@ -140,8 +297,8 @@ web/
 npm test
 ```
 
-Covers the scoring model, PGN and clock parsing, time-class inference, motif detection
-and the aggregation layer. The analysis tests run a real engine against fixture games —
+Covers the scoring model, PGN and clock parsing, time-class inference, motif detection,
+the aggregation layer, the opening lens and snapshot inlining. The analysis tests run a real engine against fixture games —
 including checking that the app calls Morphy's 13.Rxd7 in the Opera Game brilliant.
 
 ---
@@ -159,3 +316,9 @@ The interface is a tournament scoresheet, not a dashboard of cards.
   blitz mistakes are a time-pressure signal, rapid mistakes are a preparation signal, and
   averaging the two hides both.
 - **Pieces are type**, not sprites — Unicode figurines, so the board scales anywhere.
+- **Only the dark squares are drawn.** The light ones are the board itself, so no two
+  painted squares share an edge and no seam can saw along the diagonals.
+- **Your markup is teal**, which is neither the vermilion of your mistakes nor the green
+  of the engine's move — a square you marked is never mistaken for a finding.
+- **A snapshot says when it was taken.** The one risk of reading a frozen sheet is
+  mistaking last month's form for today's, so the date is in the masthead, not buried.

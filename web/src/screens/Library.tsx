@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
-import { Empty, ErrorNote, Loading } from '../components/Chrome';
+import { Empty, ErrorNote, Loading, OpeningBand } from '../components/Chrome';
 import { formatDate, pluralise, timeControlLabel } from '../format';
-import { TIME_CLASSES, type Game, type GameResult, type Scope } from '../types';
+import { lensKey, TIME_CLASSES } from '../types';
+import type { Game, GameResult, Lens, OpeningRow, Scope } from '../types';
 
 const COLUMNS = '92px 1fr 118px 92px 92px 84px';
 
 export function Library({
   username,
-  scope,
+  lens,
   onScopeChange,
+  onLensChange,
 }: {
   username: string | null;
-  scope: Scope;
+  lens: Lens;
   onScopeChange: (scope: Scope) => void;
+  onLensChange: (lens: Lens) => void;
 }) {
   const navigate = useNavigate();
   const [games, setGames] = useState<Game[]>([]);
+  const [openings, setOpenings] = useState<OpeningRow[]>([]);
   const [total, setTotal] = useState(0);
   const [result, setResult] = useState<GameResult | 'all'>('all');
   const [opponent, setOpponent] = useState('');
@@ -32,7 +36,14 @@ export function Library({
     // Debounced so typing an opponent name does not fire a request per keystroke.
     const timer = setTimeout(() => {
       api
-        .games(username, { timeClass: scope, result, opponent: opponent.trim(), limit: 100 })
+        .games(username, {
+          timeClass: lens.scope,
+          eco: lens.eco ?? undefined,
+          color: lens.color ?? undefined,
+          result,
+          opponent: opponent.trim(),
+          limit: 100,
+        })
         .then((response) => {
           if (cancelled) return;
           setGames(response.games);
@@ -51,7 +62,27 @@ export function Library({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [username, scope, result, opponent]);
+    // The lens is an object rebuilt on every render, so the key is the dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, lensKey(lens), result, opponent]);
+
+  // The opening menu belongs to the time class, not to the filtered list, so it is
+  // fetched on its own and survives a filter that matches nothing.
+  useEffect(() => {
+    if (!username) return;
+    let cancelled = false;
+    api
+      .openings(username, lens.scope)
+      .then((response) => {
+        if (!cancelled) setOpenings(response.openings);
+      })
+      .catch(() => {
+        if (!cancelled) setOpenings([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [username, lens.scope]);
 
   if (!username) {
     return <Empty title="Nothing imported yet.">Import a username first, then every game lands here.</Empty>;
@@ -74,7 +105,7 @@ export function Library({
         <div className="band-label">time class</div>
         <button
           type="button"
-          className={`band-option${scope === 'all' ? ' is-active' : ''}`}
+          className={`band-option${lens.scope === 'all' ? ' is-active' : ''}`}
           onClick={() => onScopeChange('all')}
         >
           All
@@ -83,13 +114,15 @@ export function Library({
           <button
             key={timeClass}
             type="button"
-            className={`band-option${scope === timeClass ? ' is-active' : ''}`}
+            className={`band-option${lens.scope === timeClass ? ' is-active' : ''}`}
             onClick={() => onScopeChange(timeClass)}
           >
             {timeClass}
           </button>
         ))}
       </div>
+
+      <OpeningBand lens={lens} openings={openings} onChange={onLensChange} />
 
       <div
         style={{
@@ -131,7 +164,9 @@ export function Library({
       ) : loading && games.length === 0 ? (
         <Loading label="loading games" />
       ) : games.length === 0 ? (
-        <Empty title="No games match that filter.">Try a different time class or result.</Empty>
+        <Empty title="No games match that filter.">
+          Try a different time class, opening or result.
+        </Empty>
       ) : (
         <div className="rows">
           <div className="row-head label" style={{ gridTemplateColumns: COLUMNS }}>

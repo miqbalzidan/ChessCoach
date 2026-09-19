@@ -1,14 +1,19 @@
-import Anthropic from '@anthropic-ai/sdk';
+/**
+ * The coaching layer, minus the model call.
+ *
+ * Everything here runs anywhere: the brief that gets handed to Claude, the offline
+ * summariser that writes the same shape deterministically, and the per-lens cache.
+ * Only the API call itself needs a key and a network, and that lives in
+ * `server/src/coach-claude.ts` — which is why a phone with no key still gets a
+ * written summary rather than an empty panel.
+ */
 import { z } from 'zod';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { DB } from './db.js';
 import type { Pattern } from './patterns.js';
-import type { Scope } from './stats.js';
+import { lensKey, lensLabel, type Lens } from './lens.js';
 import type { dashboard } from './stats.js';
 
-const MODEL = process.env.COACH_MODEL ?? 'claude-opus-5';
-
-const CoachingSchema = z.object({
+export const CoachingSchema = z.object({
   headline: z
     .string()
     .describe('One sentence naming the single biggest recurring weakness, in plain language.'),
@@ -31,7 +36,7 @@ const CoachingSchema = z.object({
 
 export type Coaching = z.infer<typeof CoachingSchema> & { model: string; generatedAt: number };
 
-const SYSTEM_PROMPT = `You are a chess coach reviewing one player's analysed game history.
+export const SYSTEM_PROMPT = `You are a chess coach reviewing one player's analysed game history.
 
 You are given aggregate statistics and mistake patterns that were detected by an engine,
 not by you. Treat every number in the brief as fact and never invent new ones.
@@ -45,13 +50,9 @@ supports it. Prefer advice the player can act on this week.`;
 
 export interface CoachingInput {
   username: string;
-  scope: Scope;
+  lens: Lens;
   stats: ReturnType<typeof dashboard>;
   patterns: Pattern[];
-}
-
-export function hasApiKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 }
 
 /**
@@ -60,12 +61,12 @@ export function hasApiKey(): boolean {
  * renders from.
  */
 export function buildBrief(input: CoachingInput): string {
-  const { stats, patterns, scope } = input;
+  const { stats, patterns, lens } = input;
   const head = stats.headline;
   const lines: string[] = [];
 
   lines.push(`Player: ${input.username}`);
-  lines.push(`Segment: ${scope === 'all' ? 'all time controls' : scope}`);
+  lines.push(`Segment: ${lensLabel(lens)}`);
   lines.push(
     `Sample: ${head.analysedGames} analysed games (${head.record.win}W/${head.record.loss}L/${head.record.draw}D, ${head.winRate}% win rate), ${head.moves} of their own moves.`,
   );
@@ -104,7 +105,7 @@ export function buildBrief(input: CoachingInput): string {
     }
   }
 
-  const weakOpenings = stats.openings.filter((o) => o.games >= 3).slice(0, 5);
+  const weakOpenings = lens.eco ? [] : stats.openings.filter((o) => o.games >= 3).slice(0, 5);
   if (weakOpenings.length > 0) {
     lines.push('');
     lines.push('Most played openings (ECO, as which colour, win rate):');
@@ -150,56 +151,7 @@ export function listPhrase(items: string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
-export async function generateCoaching(input: CoachingInput): Promise<Coaching> {
-  if (input.patterns.length === 0) {
-    return { ...emptyCoaching(), model: 'none', generatedAt: now() };
-  }
-  if (!hasApiKey()) {
-    return { ...fallbackCoaching(input), model: 'offline', generatedAt: now() };
-  }
-
-  const client = new Anthropic();
-  const brief = buildBrief(input);
-
-  try {
-    const response = await client.messages.parse({
-      model: MODEL,
-      max_tokens: 16000,
-      system: SYSTEM_PROMPT,
-      thinking: { type: 'adaptive' },
-      output_config: { format: zodOutputFormat(CoachingSchema) },
-      messages: [
-        {
-          role: 'user',
-          content: `${brief}\n\nWrite the coaching summary. Cover every pattern key listed above, in the same order.`,
-        },
-      ],
-    });
-
-    const parsed = response.parsed_output;
-    if (!parsed) return { ...fallbackCoaching(input), model: 'offline', generatedAt: now() };
-    return { ...parsed, model: response.model, generatedAt: now() };
-  } catch (error) {
-    // Coaching is a layer on top of the analysis, never a prerequisite for it, so a
-    // failed call degrades to the deterministic summary instead of failing the page.
-    if (error instanceof Anthropic.AuthenticationError) {
-      return { ...fallbackCoaching(input), model: 'offline (invalid API key)', generatedAt: now() };
-    }
-    if (error instanceof Anthropic.RateLimitError) {
-      return { ...fallbackCoaching(input), model: 'offline (rate limited)', generatedAt: now() };
-    }
-    if (error instanceof Anthropic.APIError) {
-      return {
-        ...fallbackCoaching(input),
-        model: `offline (API error ${error.status})`,
-        generatedAt: now(),
-      };
-    }
-    throw error;
-  }
-}
-
-function emptyCoaching(): z.infer<typeof CoachingSchema> {
+export function emptyCoaching(): z.infer<typeof CoachingSchema> {
   return {
     headline: 'Not enough analysed games yet to find a repeating pattern.',
     diagnosis:
@@ -250,14 +202,29 @@ export function fallbackCoaching(input: CoachingInput): z.infer<typeof CoachingS
   };
 }
 
-function now(): number {
+/**
+ * The summary a host with no model writes for itself.
+ *
+ * Both hosts need the same two-step decision — nothing to say yet, versus the
+ * deterministic summary — so it lives here rather than being written once in the
+ * server's Claude path and again in the phone's Worker. The phone has no API key and
+ * nowhere safe to keep one, so for it this is not a fallback: it is the writer.
+ */
+export function offlineCoaching(input: CoachingInput): Coaching {
+  if (input.patterns.length === 0) {
+    return { ...emptyCoaching(), model: 'none', generatedAt: now() };
+  }
+  return { ...fallbackCoaching(input), model: 'offline', generatedAt: now() };
+}
+
+export function now(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-export function readCachedCoaching(db: DB, playerId: number, scope: Scope): Coaching | null {
+export function readCachedCoaching(db: DB, playerId: number, lens: Lens): Coaching | null {
   const row = db
-    .prepare('SELECT body, model, created_at FROM coaching WHERE player_id = ? AND scope = ?')
-    .get(playerId, scope) as { body: string; model: string; created_at: number } | undefined;
+    .prepare('SELECT body, model, created_at FROM coaching WHERE player_id = ? AND lens = ?')
+    .get(playerId, lensKey(lens)) as { body: string; model: string; created_at: number } | undefined;
   if (!row) return null;
   try {
     return { ...JSON.parse(row.body), model: row.model, generatedAt: row.created_at };
@@ -269,17 +236,17 @@ export function readCachedCoaching(db: DB, playerId: number, scope: Scope): Coac
 export function writeCachedCoaching(
   db: DB,
   playerId: number,
-  scope: Scope,
+  lens: Lens,
   coaching: Coaching,
 ): void {
   db.prepare(
-    `INSERT INTO coaching (player_id, scope, body, model, created_at)
+    `INSERT INTO coaching (player_id, lens, body, model, created_at)
      VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT (player_id, scope) DO UPDATE SET
+     ON CONFLICT (player_id, lens) DO UPDATE SET
        body = excluded.body, model = excluded.model, created_at = excluded.created_at`,
   ).run(
     playerId,
-    scope,
+    lensKey(lens),
     JSON.stringify({
       headline: coaching.headline,
       diagnosis: coaching.diagnosis,

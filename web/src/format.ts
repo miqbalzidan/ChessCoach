@@ -80,3 +80,16 @@ export function timeControlLabel(timeControl: string): string {
 export function pluralise(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
+
+/** What kind of event a move was, read straight out of its SAN. Lives here with the
+ *  other readers rather than in sound.ts, so it stays free of anything browser-only
+ *  and can be tested alongside the rest. */
+export type MoveSound = 'move' | 'capture' | 'check';
+
+export function soundForSan(san: string | undefined | null): MoveSound {
+  if (!san) return 'move';
+  // Bxf7+ is both a capture and a check; the check is the thing worth hearing.
+  if (san.includes('+') || san.includes('#')) return 'check';
+  if (san.includes('x')) return 'capture';
+  return 'move';
+}

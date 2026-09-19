@@ -14,6 +14,15 @@ export type Classification =
 
 export const TIME_CLASSES: TimeClass[] = ['bullet', 'blitz', 'rapid', 'daily'];
 
+/* ---------- the lens ----------
+   Defined in core, because the server, the browser and the analysis all narrow by
+   it. Re-exported here so every screen keeps importing it from one place. */
+
+import type { Lens } from '../../core/src/types';
+
+export type { Lens };
+export { lensKey } from '../../core/src/types';
+
 /** Chess's own annotation vocabulary is the icon set. */
 export const GLYPH: Record<Classification, string> = {
   brilliant: '!!',
@@ -170,9 +179,18 @@ export interface TimeClassSummary {
   winRate: number;
 }
 
+export interface AnalysisSource {
+  engine: string;
+  depth: number;
+  games: number;
+}
+
 export interface Dashboard {
   player: Player;
   scope: Scope;
+  /** The narrowing these numbers were computed under, echoed back so a screen can
+   *  never label one lens's figures with another's. */
+  lens: Lens;
   headline: Headline;
   timeClasses: TimeClassSummary[];
   trend: TrendPoint[];
@@ -180,6 +198,9 @@ export interface Dashboard {
   openings: OpeningRow[];
   clock: { buckets: ClockBucket[]; coverage: number; worstMultiplier: number };
   classifications: Array<{ classification: Classification; count: number }>;
+  /** Which engine and depth produced these games. More than one entry means the
+   *  figures below mix instruments, which the sheet says rather than hides. */
+  sources: AnalysisSource[];
 }
 
 export interface PatternExample {
@@ -240,4 +261,67 @@ export interface Settings {
   engines: number;
   coaching: 'claude' | 'offline';
   players: Player[];
+  /** Only sent by the in-browser copy of the app, and only it can be false: a
+   *  server's disk does not evaporate. False means this browser refused OPFS and
+   *  the database is in memory, so nothing imported here outlives a reload. */
+  persistent?: boolean;
+}
+
+export interface Trait {
+  key: string;
+  title: string;
+  detail: string;
+  /** The measurement behind the claim, shown beside it. */
+  evidence: string;
+  weight: number;
+}
+
+export interface Profile {
+  strengths: Trait[];
+  weaknesses: Trait[];
+  games: number;
+  /** Too few games to say anything responsibly. */
+  thin: boolean;
+}
+
+/* ---------- snapshot ----------
+   A snapshot is the whole leak sheet frozen at a moment: everything the read-only
+   screens ask for, already computed. The phone has no engine and no database, so
+   anything not in here cannot be shown.
+
+   This type is the contract between the exporter (server/src/export.ts) and the
+   client that reads it. Both import it from this file, so a field added on one
+   side and forgotten on the other is a compile error rather than a blank panel
+   discovered on a phone. */
+
+export const SNAPSHOT_VERSION = 2;
+
+export interface SnapshotScope {
+  dashboard: Dashboard;
+  patterns: Pattern[];
+  /** Motif key → display label, as the patterns endpoint returns it. */
+  labels: Record<string, string>;
+  /** Null when a scope has no games worth coaching on. */
+  coaching: Coaching | null;
+  profile: Profile;
+}
+
+export interface Snapshot {
+  version: number;
+  /** Unix seconds — shown in the masthead so a stale sheet is never mistaken for a live one. */
+  generatedAt: number;
+  engine: string;
+  analysisDepth: number;
+  /** The minimum-occurrence cut-off the patterns were computed with. */
+  minOccurrences: number;
+  player: Player;
+  games: Game[];
+  /** Game id → its moves. Keys are strings because this survives JSON. */
+  moves: Record<string, Move[]>;
+  /** Lens key → the whole sheet under that lens: the five time classes, plus one
+   *  entry per opening the picker can reach. A lens that was never exported cannot
+   *  be computed on a phone, so the picker only ever offers what is in here. */
+  lenses: Record<string, SnapshotScope>;
+  /** Version 1 snapshots, keyed by time class alone. Read on load, never written. */
+  scopes?: Record<Scope, SnapshotScope>;
 }

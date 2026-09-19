@@ -26,6 +26,7 @@
 
   --board-light: #efeadd;
   --board-dark: #b9a988;
+  --mark: #3f7d8c;
   --piece-white: #f6f1e4;
 
   --display: 'Bodoni Moda', 'Didot', 'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -107,7 +108,14 @@ a {
   max-width: 1180px;
   margin: 0 auto;
   min-height: 100vh;
+  /* Android's address bar grows and shrinks as you scroll; dvh tracks that, vh does
+     not, and a stale vh leaves a bone-coloured gap under the last rule. */
+  min-height: 100dvh;
   background: var(--bone);
+  /* Installed to a home screen the page runs edge to edge, under the status bar and
+     the gesture pill, so the sheet carries the insets itself. Zero on desktop. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
 }
 
 .masthead {
@@ -236,6 +244,55 @@ a {
 .band-option .count {
   opacity: 0.55;
   margin-left: 6px;
+}
+
+/* ---------- opening band ----------
+   The second lens sits directly under the first, so the two read as one control
+   stack: time class, then what came out of the opening. It carries no top rule of
+   its own — the band above already drew one. */
+
+.band-opening {
+  margin-top: 0;
+  border-top: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.band-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  padding: 8px 12px;
+  font: 600 12px/1.3 var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.band-select:focus-visible {
+  outline: 2px solid var(--vermilion);
+  outline-offset: 1px;
+}
+
+.band-clear {
+  flex: none;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--vermilion);
+  text-decoration: underline;
+}
+
+/* Wherever a screen states what it is showing, the opening it is narrowed to is
+   part of that statement — otherwise the numbers look like the whole history. */
+.opening-note {
+  color: var(--mark);
+  font-weight: 600;
 }
 
 /* ---------- stat row ---------- */
@@ -651,6 +708,39 @@ a {
   background: var(--wash);
 }
 
+/* ---------- openings ---------- */
+
+.openings {
+  padding-bottom: 12px;
+}
+
+.opening-row {
+  grid-template-columns: 52px 1fr 64px 68px 96px 72px 84px;
+}
+
+.row.opening-row.is-active {
+  background: var(--ink);
+  color: var(--bone);
+}
+
+.row.opening-row.is-active .meta,
+.row.opening-row.is-active .numeric {
+  color: var(--bone);
+  opacity: 0.86;
+}
+
+@media (max-width: 860px) {
+  /* Name and record carry the row on a phone; the rest is detail the sheet can
+     afford to drop rather than squeeze into 40 pixels. */
+  .opening-row {
+    grid-template-columns: 46px 1fr 60px 60px;
+  }
+
+  .opening-row > :nth-child(n + 5) {
+    display: none;
+  }
+}
+
 .result-win {
   color: #2f6b4f;
   font-weight: 600;
@@ -672,10 +762,22 @@ a {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
+  /* The pieces size themselves from this box rather than from the viewport, so the
+     same component works at review size and at pattern-example size. */
+  container-type: inline-size;
   border: 1px solid var(--ink);
-  background-image: repeating-conic-gradient(var(--board-light) 0 25%, var(--board-dark) 0 50%);
-  background-size: 25% 25%;
+  /* The light squares are the board itself and only the dark ones are drawn, so no
+     two painted squares share an edge and there is no seam to saw. A repeating
+     gradient put its stops on fractional pixels and jagged along every diagonal. */
+  background: var(--board-light);
   user-select: none;
+}
+
+.board-dark-square {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  background: var(--board-dark);
 }
 
 .board-square {
@@ -708,11 +810,40 @@ a {
   position: absolute;
   width: 12.5%;
   height: 12.5%;
+  /* A square is 12.5% of the board, so the glyph is a share of the board's own
+     width. Sized from the viewport instead, a small board keeps a large board's
+     pieces and they spill across their squares. */
+  font-size: 8.5cqw;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
   color: var(--ink);
+  /* Clicks belong to the square underneath, so right-click markup works wherever
+     you aim it rather than only on the empty squares. */
+  pointer-events: none;
+}
+
+/* The piece is drawn on its destination square and run in from where it came. An
+   animation rather than a transition, because a transition needs a second render to
+   change the value and an animation just plays. */
+@keyframes piece-slide {
+  from {
+    transform: translate(var(--dx, 0), var(--dy, 0));
+  }
+  to {
+    transform: none;
+  }
+}
+
+.piece.is-sliding {
+  animation: piece-slide 170ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piece.is-sliding {
+    animation: none;
+  }
 }
 
 .piece-white {
@@ -919,6 +1050,315 @@ a {
   }
 }
 
+/* ---------- scouting report ---------- */
+
+.scout {
+  margin-top: 8px;
+}
+
+.scout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--margin);
+  margin: 0 var(--margin);
+}
+
+/* A rule between the columns rather than a box around each: the two readings are
+   one report, not two cards. */
+.scout-grid > * + * {
+  border-left: 1px solid var(--rule);
+  padding-left: var(--margin);
+}
+
+.scout-heading {
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ink);
+  margin-bottom: 4px;
+}
+
+.scout-heading-weakness {
+  color: var(--vermilion);
+}
+
+.trait {
+  padding: 15px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.trait-title {
+  font: 600 17px/1.25 var(--display);
+}
+
+.trait-detail {
+  margin-top: 5px;
+  max-width: 48ch;
+}
+
+.trait-evidence {
+  margin-top: 8px;
+  font: 400 11px/1.5 var(--mono);
+  color: var(--muted);
+}
+
+.trait-weakness .trait-evidence {
+  color: var(--vermilion);
+}
+
+.scout-thin {
+  margin: 0 var(--margin);
+  padding: 16px 0;
+  max-width: 60ch;
+}
+
+.scout-grid .scout-thin {
+  margin: 0;
+}
+
+/* The game's header. In the stylesheet rather than inline, because the phone
+   breakpoint has to be able to stack it — an inline grid-template-columns cannot be
+   overridden by a media query, and the scores would push the page sideways. */
+.review-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 24px;
+  padding: 22px var(--margin) 18px;
+  border-bottom: 3px solid var(--ink);
+}
+
+.review-scores {
+  display: flex;
+  gap: 26px;
+  text-align: right;
+  align-items: baseline;
+}
+
+/* ---------- players either side of the board ---------- */
+
+.player-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 9px 2px;
+  font: 400 13px/1 var(--mono);
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* The strip under the board closes it off; the one above opens it. */
+.board-wrap + .player-strip {
+  border-bottom: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.player-strip.is-you .player-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Which colour this player had, since the board can be the other way up. */
+.player-disc {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  align-self: center;
+  flex: none;
+}
+
+.player-disc-white {
+  background: var(--piece-white);
+}
+
+.player-disc-black {
+  background: var(--ink);
+}
+
+.player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-rating {
+  color: var(--muted);
+}
+
+.player-you {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--vermilion);
+}
+
+.player-accuracy {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+.review-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-sm {
+  font-size: 10px;
+  padding: 7px 11px;
+  text-decoration: none;
+}
+
+/* Reading about the motif is the next step after seeing it, so the link sits inside
+   the panel that names it rather than somewhere else on the page. */
+.lesson-link {
+  display: inline-block;
+  margin-top: 14px;
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vermilion-pale);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(232, 226, 212, 0.35);
+  padding-bottom: 3px;
+}
+
+.lesson-link:hover {
+  color: #fff;
+  border-bottom-color: #fff;
+}
+
+/* Your own markup: a colour that is neither vermilion (which means your mistake)
+   nor the engine's green, so a square you marked is never read as a finding. */
+.square-marked {
+  background: rgba(63, 125, 140, 0.45);
+  box-shadow: inset 0 0 0 2px var(--mark);
+}
+
+.board-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.board-arrows line {
+  stroke: var(--mark);
+  stroke-width: 0.16;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+/* An expanded pattern: the boards on the left, the follow-up beside them. This
+   lives here rather than inline so the phone breakpoint below can collapse it —
+   an inline grid-template-columns cannot be overridden by a media query, and a
+   fixed 320px aside on a 412px screen lands on top of the boards. */
+.pattern-detail {
+  padding: 20px 0 28px;
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--margin);
+  align-items: start;
+}
+
+.pattern-examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 20px;
+}
+
+/* ---------- snapshot ---------- */
+
+/* Sits under the masthead title in a read-only sheet. Quiet, but never absent: the
+   whole risk of a snapshot is reading last month's form as today's. */
+.masthead-provenance {
+  font: 400 11px/1.5 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(20, 19, 15, 0.45);
+  margin-top: 7px;
+}
+
+.snapshot-facts {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 0;
+  /* Aligns with .section-head above it rather than running to the page edge. */
+  margin: 0 var(--margin);
+}
+
+.snapshot-facts dt {
+  font: 400 11px/1 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(20, 19, 15, 0.5);
+  padding: 13px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.snapshot-facts dd {
+  margin: 0;
+  padding: 13px 0;
+  border-top: 1px solid var(--rule);
+  font: 400 15px/1.4 var(--body);
+}
+
+/* Everything in the snapshot panel shares the section gutter. */
+.snapshot-body {
+  margin: 0 var(--margin);
+  max-width: 62ch;
+}
+
+.snapshot-actions {
+  margin: 18px var(--margin) 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .snapshot-facts {
+    grid-template-columns: 96px 1fr;
+  }
+
+  /* The follow-up reads after the boards it refers to, not beside them. */
+  .pattern-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .review-head {
+    grid-template-columns: 1fr;
+  }
+
+  /* Names are long and the scores are wide; together they do not fit a phone, so
+     they stack and read left to right like everything else. */
+  .review-scores {
+    flex-wrap: wrap;
+    gap: 18px;
+    text-align: left;
+  }
+
+  .review-actions {
+    flex-wrap: wrap;
+  }
+
+  /* The two readings stack, and the divider becomes the rule above the second. */
+  .scout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scout-grid > * + * {
+    border-left: 0;
+    padding-left: 0;
+    margin-top: 26px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
@@ -1067,4 +1507,55 @@ a {
   .move-list {
     max-height: none;
   }
+}
+
+/* ---------- the import warning ----------
+   Shown before a long analysis starts, not after. It is ink-on-paper rather than
+   vermilion: this is not an error, it is the length of the job. */
+
+.import-warning {
+  margin: 24px 0 0;
+  padding: 18px 20px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--mark);
+  background: var(--wash);
+}
+
+.import-warning-time {
+  font: 600 17px/1.2 var(--display);
+  margin-bottom: 8px;
+}
+
+/* ---------- opening a .pgn ---------- */
+
+.pgn-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pgn-file-name {
+  font: 400 12px/1.3 var(--mono);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- mixed analysis ----------
+   Sits above the trend, because that is the chart it changes the reading of. */
+
+.mixed-analysis {
+  margin: 24px var(--margin) 0;
+  padding: 16px 20px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--mark);
+  background: var(--wash);
+}
+
+.mixed-analysis .prose {
+  margin-top: 8px;
+  max-width: 68ch;
 }

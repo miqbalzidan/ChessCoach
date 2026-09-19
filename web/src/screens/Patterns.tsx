@@ -2,18 +2,29 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { Board } from '../components/Board';
-import { Empty, ErrorNote, Loading, TimeClassBand } from '../components/Chrome';
+import { lessonFor } from '../links';
+import {
+  Empty,
+  ErrorNote,
+  Loading,
+  OpeningBand,
+  TimeClassBand,
+  lensOpeningLabel,
+} from '../components/Chrome';
 import { formatClock, formatDate, pluralise } from '../format';
-import type { Coaching, Pattern, Scope, TimeClassSummary } from '../types';
+import { lensKey } from '../types';
+import type { Coaching, Lens, OpeningRow, Pattern, Scope, TimeClassSummary } from '../types';
 
 export function Patterns({
   username,
-  scope,
+  lens,
   onScopeChange,
+  onLensChange,
 }: {
   username: string | null;
-  scope: Scope;
+  lens: Lens;
   onScopeChange: (scope: Scope) => void;
+  onLensChange: (lens: Lens) => void;
 }) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -21,6 +32,7 @@ export function Patterns({
 
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [summaries, setSummaries] = useState<TimeClassSummary[]>([]);
+  const [openings, setOpenings] = useState<OpeningRow[]>([]);
   const [coaching, setCoaching] = useState<Coaching | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +43,12 @@ export function Patterns({
     let cancelled = false;
     setLoading(true);
 
-    Promise.all([api.patterns(username, scope), api.dashboard(username, scope)])
+    Promise.all([api.patterns(username, lens), api.dashboard(username, lens)])
       .then(([patternResponse, dashboard]) => {
         if (cancelled) return;
         setPatterns(patternResponse.patterns);
         setSummaries(dashboard.timeClasses);
+        setOpenings(dashboard.openings);
         setError(null);
       })
       .catch((err: unknown) => {
@@ -48,14 +61,16 @@ export function Patterns({
     return () => {
       cancelled = true;
     };
-  }, [username, scope]);
+    // The lens is an object rebuilt on every render, so the key is the dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, lensKey(lens)]);
 
   useEffect(() => {
     if (!username) return;
     let cancelled = false;
     setCoaching(null);
     api
-      .coaching(username, scope)
+      .coaching(username, lens)
       .then((response) => {
         if (!cancelled) setCoaching(response.coaching);
       })
@@ -63,13 +78,14 @@ export function Patterns({
     return () => {
       cancelled = true;
     };
-  }, [username, scope]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, lensKey(lens)]);
 
   const regenerate = async () => {
     if (!username) return;
     setRefreshing(true);
     try {
-      const response = await api.coaching(username, scope, true);
+      const response = await api.coaching(username, lens, true);
       setCoaching(response.coaching);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not regenerate the summary');
@@ -83,6 +99,8 @@ export function Patterns({
   }
   if (loading && patterns.length === 0) return <Loading label="clustering mistakes" />;
   if (error) return <ErrorNote error={error} />;
+
+  const openingNote = lensOpeningLabel(lens, openings);
 
   return (
     <>
@@ -102,15 +120,22 @@ export function Patterns({
           A pattern needs three occurrences before it appears here.
           <br />
           Rating cost is the expected score you lost to it, converted at K=10.
+          {openingNote ? (
+            <>
+              <br />
+              <span className="opening-note">{openingNote}</span>
+            </>
+          ) : null}
         </div>
       </div>
 
       <TimeClassBand
-        scope={scope}
+        scope={lens.scope}
         onChange={onScopeChange}
         summaries={summaries}
         totalGames={summaries.reduce((sum, t) => sum + t.games, 0)}
       />
+      <OpeningBand lens={lens} openings={openings} onChange={onLensChange} />
 
       {coaching && coaching.headline ? (
         <div className="split" style={{ paddingBottom: 0 }}>
@@ -233,28 +258,12 @@ function PatternCard({
       </button>
 
       {open && (
-        <div
-          style={{
-            padding: '20px 0 28px',
-            borderBottom: '1px solid var(--rule)',
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1fr) 320px',
-            gap: 'var(--margin)',
-            alignItems: 'start',
-          }}
-          className="pattern-detail"
-        >
+        <div className="pattern-detail">
           <div>
             <div className="label" style={{ marginBottom: 14 }}>
               where it happened
             </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
-                gap: 20,
-              }}
-            >
+            <div className="pattern-examples">
               {pattern.examples.map((example) => (
                 <button
                   key={`${example.gameId}-${example.ply}`}
@@ -314,6 +323,21 @@ function PatternCard({
                 ? ` · most often in ${pattern.topOpening.eco} (${pattern.topOpening.count}×)`
                 : ''}
             </div>
+            {(() => {
+              // Knowing the leak is half of it; the other half is somewhere to go and
+              // read about it, which is the one thing this app cannot supply itself.
+              const lesson = lessonFor(pattern.motif);
+              return lesson ? (
+                <a
+                  className="lesson-link"
+                  href={lesson.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  learn: {lesson.title} ↗
+                </a>
+              ) : null;
+            })()}
           </aside>
         </div>
       )}

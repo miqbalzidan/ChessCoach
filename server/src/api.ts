@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express';
-import type { DB } from './db.js';
-import { getSetting, setSetting } from './db.js';
-import type { EnginePool } from './engine.js';
-import { analyseGame } from './analysis.js';
+import type { DB } from './db-node.js';
+import { getSetting, setSetting } from './db-node.js';
+import type { EnginePool } from './engine-node.js';
+import { analyseGame } from '../../core/src/analysis.js';
 import {
   createJob,
   getJob,
@@ -10,7 +10,7 @@ import {
   runImport,
   runPgnImport,
   analysePending,
-} from './importer.js';
+} from '../../core/src/importer.js';
 import {
   deletePlayerData,
   findPlayer,
@@ -20,12 +20,15 @@ import {
   listPlayers,
   saveAnalysis,
   upsertPlayer,
-} from './store.js';
-import { dashboard, type Scope } from './stats.js';
-import { detectPatterns } from './patterns.js';
-import { generateCoaching, hasApiKey, readCachedCoaching, writeCachedCoaching } from './coach.js';
-import { MOTIF_LABELS } from './motifs.js';
-import { TIME_CLASSES, type GameResult, type TimeClass } from './types.js';
+} from '../../core/src/store.js';
+import { dashboard, openings } from '../../core/src/stats.js';
+import { parseEco, parseLens, parseScope } from '../../core/src/lens.js';
+import { detectPatterns } from '../../core/src/patterns.js';
+import { profile } from '../../core/src/profile.js';
+import { readCachedCoaching, writeCachedCoaching } from '../../core/src/coach.js';
+import { generateCoaching, hasApiKey } from './coach-claude.js';
+import { MOTIF_LABELS } from '../../core/src/motifs.js';
+import { TIME_CLASSES, type GameResult, type TimeClass } from '../../core/src/types.js';
 
 export function createApi(db: DB, pool: EnginePool): Router {
   const router = Router();
@@ -123,6 +126,8 @@ export function createApi(db: DB, pool: EnginePool): Router {
     const { games, total } = listGames(db, player.id, {
       timeClass: parseScope(req.query.timeClass),
       result: parseResult(req.query.result),
+      eco: parseEco(req.query.eco),
+      color: parseColor(req.query.color),
       opponent: req.query.opponent ? String(req.query.opponent) : undefined,
       from: optionalNumber(req.query.from),
       to: optionalNumber(req.query.to),
@@ -157,17 +162,35 @@ export function createApi(db: DB, pool: EnginePool): Router {
   router.get('/players/:username/dashboard', (req, res) => {
     const player = findPlayer(db, req.params.username);
     if (!player) return res.status(404).json({ error: 'No such player' });
-    res.json({ player, ...dashboard(db, player.id, parseScope(req.query.scope) ?? 'all') });
+    res.json({ player, ...dashboard(db, player.id, parseLens(req.query)) });
+  });
+
+  router.get('/players/:username/profile', (req, res) => {
+    const player = findPlayer(db, req.params.username);
+    if (!player) return res.status(404).json({ error: 'No such player' });
+    const lens = parseLens(req.query);
+    res.json({ scope: lens.scope, lens, profile: profile(db, player.id, lens) });
+  });
+
+  /* The menu the opening filter is chosen from. It is its own endpoint because it
+     belongs to no one report: every screen that offers the filter needs it, and the
+     screen that is already narrowed to one opening needs it most. */
+  router.get('/players/:username/openings', (req, res) => {
+    const player = findPlayer(db, req.params.username);
+    if (!player) return res.status(404).json({ error: 'No such player' });
+    const scope = parseScope(req.query.scope) ?? 'all';
+    res.json({ scope, openings: openings(db, player.id, { scope }) });
   });
 
   router.get('/players/:username/patterns', (req, res) => {
     const player = findPlayer(db, req.params.username);
     if (!player) return res.status(404).json({ error: 'No such player' });
-    const scope = parseScope(req.query.scope) ?? 'all';
+    const lens = parseLens(req.query);
     const minOccurrences = optionalNumber(req.query.min) ?? 3;
     res.json({
-      scope,
-      patterns: detectPatterns(db, player.id, scope, { minOccurrences }),
+      scope: lens.scope,
+      lens,
+      patterns: detectPatterns(db, player.id, lens, { minOccurrences }),
       labels: MOTIF_LABELS,
     });
   });
@@ -176,21 +199,21 @@ export function createApi(db: DB, pool: EnginePool): Router {
     const player = findPlayer(db, req.params.username);
     if (!player) return res.status(404).json({ error: 'No such player' });
 
-    const scope = parseScope(req.query.scope) ?? 'all';
+    const lens = parseLens(req.query);
     if (req.query.refresh !== 'true') {
-      const cached = readCachedCoaching(db, player.id, scope);
-      if (cached) return res.json({ scope, coaching: cached, cached: true });
+      const cached = readCachedCoaching(db, player.id, lens);
+      if (cached) return res.json({ scope: lens.scope, lens, coaching: cached, cached: true });
     }
 
     try {
       const coaching = await generateCoaching({
         username: player.username,
-        scope,
-        stats: dashboard(db, player.id, scope),
-        patterns: detectPatterns(db, player.id, scope),
+        lens,
+        stats: dashboard(db, player.id, lens),
+        patterns: detectPatterns(db, player.id, lens),
       });
-      writeCachedCoaching(db, player.id, scope, coaching);
-      res.json({ scope, coaching, cached: false });
+      writeCachedCoaching(db, player.id, lens, coaching);
+      res.json({ scope: lens.scope, lens, coaching, cached: false });
     } catch (error) {
       res.status(500).json({ error: messageOf(error) });
     }
@@ -256,11 +279,9 @@ function optionalNumber(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function parseScope(value: unknown): Scope | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
-  const lower = String(value).toLowerCase();
-  if (lower === 'all') return 'all';
-  return (TIME_CLASSES as string[]).includes(lower) ? (lower as TimeClass) : undefined;
+function parseColor(value: unknown): 'white' | 'black' | undefined {
+  const lower = String(value ?? '').toLowerCase();
+  return lower === 'white' || lower === 'black' ? lower : undefined;
 }
 
 function parseResult(value: unknown): GameResult | 'all' | undefined {
