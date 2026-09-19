@@ -88,7 +88,14 @@ for (const block of blocks) {
       `  font-weight: ${weight};`,
       stretch ? `  font-stretch: ${stretch};` : null,
       '  font-display: swap;',
-      `  src: url(/fonts/${file}) format('woff2');`,
+      // Relative, and deliberately so. This stylesheet sits in the same directory as
+      // the files it names, and a CSS url() resolves against the stylesheet's own
+      // location — so `./x.woff2` is correct whether the site is served from a domain
+      // root or from a project page under /<repo>/. An absolute `/fonts/x.woff2`
+      // looks right, survives every test done at the root, and then 404s on a
+      // subpath, where the page silently falls back to a system serif. Vite does not
+      // rewrite this for us: files in public/ are copied verbatim, not processed.
+      `  src: url(./${file}) format('woff2');`,
       '}',
     ]
       .filter(Boolean)

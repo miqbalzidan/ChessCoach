@@ -174,8 +174,11 @@ export function inlineIntoHtml(
   // Fonts: the stylesheet comes in, and each woff2 it names becomes a data URI. This
   // design is carried by its typefaces, so a snapshot that has to fall back to a system
   // serif is not the thing that was designed.
+  // The href carries whatever base the build used, so match the tail rather than the
+  // whole path: an export built under a project page would otherwise not match here,
+  // and the failure is silent — a snapshot in the wrong typeface, not an error.
   html = html.replace(
-    /<link[^>]*rel="stylesheet"[^>]*href="\/(fonts\/fonts\.css)"[^>]*>/g,
+    /<link[^>]*rel="stylesheet"[^>]*href="[^"]*\/(fonts\/fonts\.css)"[^>]*>/g,
     (_match, href: string) => `<style>${inlineFontUrls(distDir, readAsset(distDir, href))}</style>`,
   );
 
@@ -235,10 +238,18 @@ function snapshotScripts(snapshot: Snapshot, plainFallback: boolean): string {
 </script>`;
 }
 
-/** Rewrites `url(/fonts/x.woff2)` to the font itself. */
+/**
+ * Rewrites `url(./x.woff2)` to the font itself.
+ *
+ * The bare filename is what the stylesheet carries, because it is relative to its own
+ * directory so that the site works under a project page as well as a domain root. The
+ * older absolute `/fonts/x.woff2` is still accepted: an export is sometimes run against
+ * a dist built before that change, and failing to inline a font is not a loud error —
+ * it is a snapshot that quietly renders in Times New Roman.
+ */
 function inlineFontUrls(distDir: string, css: string): string {
-  return css.replace(/url\(\/(fonts\/[^)]+\.woff2)\)/g, (_match, file: string) => {
-    const encoded = readAssetBase64(distDir, file);
+  return css.replace(/url\((?:\.\/|\/fonts\/)([^)]+\.woff2)\)/g, (_match, file: string) => {
+    const encoded = readAssetBase64(distDir, `fonts/${file.replace(/^fonts\//, '')}`);
     return `url(data:font/woff2;base64,${encoded})`;
   });
 }

@@ -6,7 +6,7 @@
   font-style: italic;
   font-weight: 400;
   font-display: swap;
-  src: url(/fonts/bodoni-moda-italic-b737328c.woff2) format('woff2');
+  src: url(./bodoni-moda-italic-b737328c.woff2) format('woff2');
 }
 
 @font-face {
@@ -14,7 +14,7 @@
   font-style: italic;
   font-weight: 600;
   font-display: swap;
-  src: url(/fonts/bodoni-moda-italic-b737328c.woff2) format('woff2');
+  src: url(./bodoni-moda-italic-b737328c.woff2) format('woff2');
 }
 
 @font-face {
@@ -22,7 +22,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url(/fonts/bodoni-moda-normal-c032219e.woff2) format('woff2');
+  src: url(./bodoni-moda-normal-c032219e.woff2) format('woff2');
 }
 
 @font-face {
@@ -30,7 +30,7 @@
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url(/fonts/bodoni-moda-normal-c032219e.woff2) format('woff2');
+  src: url(./bodoni-moda-normal-c032219e.woff2) format('woff2');
 }
 
 @font-face {
@@ -38,7 +38,7 @@
   font-style: normal;
   font-weight: 800;
   font-display: swap;
-  src: url(/fonts/bodoni-moda-normal-c032219e.woff2) format('woff2');
+  src: url(./bodoni-moda-normal-c032219e.woff2) format('woff2');
 }
 
 @font-face {
@@ -46,7 +46,7 @@
   font-style: italic;
   font-weight: 400;
   font-display: swap;
-  src: url(/fonts/ibm-plex-mono-italic-0840095f.woff2) format('woff2');
+  src: url(./ibm-plex-mono-italic-0840095f.woff2) format('woff2');
 }
 
 @font-face {
@@ -54,7 +54,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url(/fonts/ibm-plex-mono-normal-08949f72.woff2) format('woff2');
+  src: url(./ibm-plex-mono-normal-08949f72.woff2) format('woff2');
 }
 
 @font-face {
@@ -62,7 +62,7 @@
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url(/fonts/ibm-plex-mono-normal-01d28544.woff2) format('woff2');
+  src: url(./ibm-plex-mono-normal-01d28544.woff2) format('woff2');
 }
 
 @font-face {
@@ -70,7 +70,7 @@
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url(/fonts/ibm-plex-mono-normal-0d1f0b8d.woff2) format('woff2');
+  src: url(./ibm-plex-mono-normal-0d1f0b8d.woff2) format('woff2');
 }
 
 @font-face {
@@ -78,7 +78,7 @@
   font-style: italic;
   font-weight: 400;
   font-display: swap;
-  src: url(/fonts/spectral-italic-db397149.woff2) format('woff2');
+  src: url(./spectral-italic-db397149.woff2) format('woff2');
 }
 
 @font-face {
@@ -86,7 +86,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url(/fonts/spectral-normal-cf8daee3.woff2) format('woff2');
+  src: url(./spectral-normal-cf8daee3.woff2) format('woff2');
 }
 
 @font-face {
@@ -94,5 +94,5 @@
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url(/fonts/spectral-normal-33faca8b.woff2) format('woff2');
+  src: url(./spectral-normal-33faca8b.woff2) format('woff2');
 }

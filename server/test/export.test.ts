@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { gunzipSync } from 'node:zlib';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { test, describe } from 'node:test';
@@ -14,15 +14,30 @@ const SCOPES: Scope[] = ['all', 'bullet', 'blitz', 'rapid', 'daily'];
 
 const TEMPLATE = `<!doctype html><html><head>
 <link rel="stylesheet" crossorigin href="/assets/app.css">
+<link rel="stylesheet" href="/fonts/fonts.css" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <script type="module" crossorigin src="/assets/app.js"></script>
 </head><body><div id="root"></div></body></html>`;
+
+/** The same document as served from a project page, where every href carries a base. */
+const TEMPLATE_UNDER_SUBPATH = TEMPLATE.replace(/href="\/|src="\//g, (m) =>
+  m.replace('"/', '"/ChessCoach/'),
+);
 
 function fixtureDist(bundle: string): string {
   const dir = mkdtempSync(resolve(tmpdir(), 'leaksheet-'));
   mkdirSync(resolve(dir, 'assets'), { recursive: true });
   writeFileSync(resolve(dir, 'assets/app.js'), bundle);
   writeFileSync(resolve(dir, 'assets/app.css'), '.sheet{background:#e8e2d4}');
+  // Fonts, because this design is carried by them: a snapshot that silently falls
+  // back to a system serif is not the thing that was designed, and nothing else in
+  // these tests would notice.
+  mkdirSync(resolve(dir, 'fonts'), { recursive: true });
+  writeFileSync(resolve(dir, 'fonts/bodoni.woff2'), Buffer.from('woff2-bytes'));
+  writeFileSync(
+    resolve(dir, 'fonts/fonts.css'),
+    "@font-face{font-family:'Bodoni Moda';src:url(./bodoni.woff2) format('woff2');}",
+  );
   return dir;
 }
 
@@ -70,6 +85,21 @@ describe('snapshot inlining', () => {
     assert.ok(!html.includes('href="/assets'), 'stylesheet still external');
     assert.ok(!html.includes('rel="manifest"'), 'manifest link cannot resolve in one file');
     assert.ok(html.includes('.sheet{background:#e8e2d4}'), 'stylesheet was not inlined');
+  });
+
+  test('the typefaces travel with the file', () => {
+    const html = inlineIntoHtml(TEMPLATE, fixtureSnapshot(), fixtureDist('var x=1;'));
+    assert.ok(html.includes('data:font/woff2;base64,'), 'font was not inlined');
+    assert.ok(!html.includes('fonts.css'), 'stylesheet still fetched over the network');
+    assert.ok(!/url\(\.?\/?[^)]*\.woff2\)/.test(html), 'a woff2 is still a file reference');
+  });
+
+  test('an export built for a project page still inlines its fonts', () => {
+    // The href carries the base when the site is built for /<repo>/. Matching the
+    // whole absolute path would miss it here, and the failure is silent: a snapshot
+    // in Times New Roman rather than an error anybody would see.
+    const html = inlineIntoHtml(TEMPLATE_UNDER_SUBPATH, fixtureSnapshot(), fixtureDist('var x=1;'));
+    assert.ok(html.includes('data:font/woff2;base64,'), 'font was not inlined under a base path');
   });
 
   test('the payload round-trips through gzip and base64', () => {
@@ -172,5 +202,42 @@ describe('which lenses a snapshot carries', () => {
     for (const scope of SCOPES) assert.ok(snapshot.lenses[scope], `no ${scope} lens`);
     assert.equal(snapshot.lenses.all!.dashboard.lens.eco, undefined);
     db.close();
+  });
+});
+
+/**
+ * The guard for the bug that shipped: `fonts.css` lives in `public/`, which Vite copies
+ * verbatim rather than processing, so nothing rewrites the URLs inside it for the base
+ * path. Root-absolute ones work perfectly everywhere this was tested — a dev server, a
+ * preview, an exported file — and then 404 on a project page, where the app quietly
+ * renders in a system serif instead of the typefaces it is built around.
+ *
+ * Asserted against the real stylesheet rather than a fixture, because the real one is
+ * what ships and the generator that writes it is the thing that regressed.
+ */
+describe('fonts survive being served from a subdirectory', () => {
+  const stylesheet = readFileSync(
+    resolve(import.meta.dirname, '../../web/public/fonts/fonts.css'),
+    'utf8',
+  );
+
+  test('no url() in the stylesheet is root-absolute', () => {
+    const absolute = [...stylesheet.matchAll(/url\((\/[^)]*)\)/g)].map((m) => m[1]);
+    assert.deepEqual(
+      absolute,
+      [],
+      `these resolve against the domain root, so they 404 under /<repo>/: ${absolute.join(', ')}`,
+    );
+  });
+
+  test('every font it names sits beside it', () => {
+    const referenced = [...stylesheet.matchAll(/url\(\.\/([^)]+\.woff2)\)/g)].flatMap((m) =>
+      m[1] ? [m[1]] : [],
+    );
+    assert.ok(referenced.length > 0, 'no fonts referenced at all');
+    for (const file of new Set(referenced)) {
+      const path = resolve(import.meta.dirname, '../../web/public/fonts', file);
+      assert.ok(existsSync(path), `fonts.css names ${file}, which is not there`);
+    }
   });
 });
