@@ -109,10 +109,21 @@ on somewhere else.
 **Installing it.** The built site carries a service worker that precaches everything
 it needs — the app, the fonts, the SQLite build and the 1.8 MB engine, about 3.7 MB in
 all. Load it once, **Add to Home Screen**, and from then on it opens and analyses with
-no network whatsoever. Publishing is a one-off: enable **Settings → Pages → Source:
-GitHub Actions** on the repository and the workflow puts the built site up on each
-push to `main`. Until Pages is switched on that job is skipped and nothing is
-published, which is deliberate — it is your repository and your decision.
+no network whatsoever.
+
+It has to be served over **HTTPS**. Service workers and OPFS are withheld from any
+plain `http://` origin that is not `localhost`, so an `http://` address gives you
+neither the install nor the storage — see *Reading it on the same network* below for
+what that route can and cannot do.
+
+Publishing is a one-off. **GitHub Pages is free on public repositories only**; on a
+private one it asks you to upgrade, so either make the repository public or publish
+the built site somewhere else (Cloudflare Pages, Netlify and Vercel all take a private
+repo on their free tiers — build `npm run build --workspace web`, publish `web/dist`,
+and set `BASE_PATH` to `/` for a root domain). For Pages: enable **Settings → Pages →
+Source: GitHub Actions**, then either merge to `main` or run the **CI** workflow from
+the Actions tab (**Run workflow**) to publish a branch without merging it. Until Pages
+is switched on, that job does nothing — it is your repository and your decision.
 
 **Archive on the computer, top up on the phone.** That is the shape this is built for,
 and it is worth following where you can:

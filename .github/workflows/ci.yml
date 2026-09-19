@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Publishing by hand, from the Actions tab. Merging to `main` publishes on its own,
+  # but that ties "put a site up" to "land the branch", and the first publish usually
+  # wants to happen before that — to check the thing installs on a real phone.
+  workflow_dispatch:
 
 # A new push makes the previous run's answer irrelevant, so stop paying for it.
 concurrency:
@@ -71,9 +75,16 @@ jobs:
   # Publishing is opt-in: this job does nothing until someone enables Pages on the
   # repository (Settings → Pages → Source: GitHub Actions). Until then it is skipped,
   # and nothing this branch does puts a site on the internet.
+  #
+  # Two ways in: landing on `main`, or running this workflow by hand against any
+  # branch. The manual route is what makes the first publish possible without
+  # merging first — and a site you cannot put up until you have merged is a site
+  # you cannot test on a phone before you merge.
   pages:
     needs: check
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     permissions:
