@@ -72,6 +72,40 @@ jobs:
             || { echo "the service worker is not precaching the engine"; exit 1; }
           echo "engine is vendored, licensed and precached"
 
+      # Four separate bugs have now shipped from the same mistake: a URL written as
+      # `/thing` rather than derived from the base path. The engine, the manifest, the
+      # fonts and the API root each looked correct at a domain root, passed every test
+      # and preview, and then pointed outside the app on a project page. None of them
+      # failed loudly. So the build is checked somewhere other than the root.
+      - name: Check the app works when it is not at the domain root
+        run: |
+          BASE_PATH=/probe-base/ npm run build --workspace web
+
+          test -f web/dist/404.html \
+            || { echo "no 404.html — deep links will 404 on a static host"; exit 1; }
+
+          # Every asset reference in the shell must carry the base path.
+          if grep -oE '(href|src)="/[^"]*"' web/dist/index.html | grep -v '"/probe-base/'; then
+            echo "^ these escape the base path and will 404 under /<repo>/"
+            exit 1
+          fi
+
+          # Fonts are in public/, which Vite copies verbatim, so nothing rewrites them.
+          if grep -oE 'url\(/[^)]*\)' web/dist/fonts/fonts.css; then
+            echo "^ root-absolute font URLs; they 404 under /<repo>/"
+            exit 1
+          fi
+
+          # The engine and the API root are built at runtime from BASE_URL.
+          grep -q "/probe-base/engine/stockfish-19-lite-single.js" web/dist/assets/*.js \
+            || { echo "the engine URL does not carry the base path"; exit 1; }
+
+          grep -q '"/probe-base/"' web/dist/sw.js \
+            || { echo "the service worker is not scoped to the base path"; exit 1; }
+
+          echo "the app stays inside its base path"
+          npm run build --workspace web
+
   # Publishing is opt-in: this job does nothing until someone enables Pages on the
   # repository (Settings → Pages → Source: GitHub Actions). Until then it is skipped,
   # and nothing this branch does puts a site on the internet.
