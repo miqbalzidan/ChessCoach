@@ -96,6 +96,47 @@ export async function readSnapshotFile(file: File): Promise<Snapshot> {
   return validate(JSON.parse(text) as Snapshot);
 }
 
+/**
+ * Writes the sheet out as the file the other device can open.
+ *
+ * Gzipped, and named the way the CLI exporter names its own output, because both
+ * ends of this already exist: the picker in Settings reads a `.leaksheet.json.gz`
+ * and seeds a database from it. What was missing was any way to produce one without
+ * a terminal — so a laptop could hand its archive to a phone only if its owner knew
+ * to run `npm run export`.
+ *
+ * `CompressionStream` is in every browser that can run this app; if it somehow is
+ * not, the plain JSON is still a file the reader accepts, so the export degrades to
+ * a larger file rather than to nothing.
+ */
+export async function downloadSnapshot(snapshot: Snapshot): Promise<string> {
+  const json = JSON.stringify(snapshot);
+  const stamp = new Date(snapshot.generatedAt * 1000).toISOString().slice(0, 10);
+  const slug = snapshot.player.username.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+  let blob: Blob;
+  let name: string;
+  if (typeof CompressionStream === 'function') {
+    const packed = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+    blob = await new Response(packed).blob();
+    name = `${slug}-${stamp}.leaksheet.json.gz`;
+  } else {
+    blob = new Blob([json], { type: 'application/json' });
+    name = `${slug}-${stamp}.leaksheet.json`;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revoking immediately can cancel the download on some browsers; a tick is enough.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return name;
+}
+
 /** Reads a snapshot file and keeps it, so this browser becomes its reader. */
 export async function importSnapshotFile(file: File): Promise<Snapshot> {
   const snapshot = await readSnapshotFile(file);

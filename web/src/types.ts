@@ -18,10 +18,16 @@ export const TIME_CLASSES: TimeClass[] = ['bullet', 'blitz', 'rapid', 'daily'];
    Defined in core, because the server, the browser and the analysis all narrow by
    it. Re-exported here so every screen keeps importing it from one place. */
 
-import type { Lens } from '../../core/src/types';
+import type { Lens } from '../../core/src/types.js';
 
 export type { Lens };
-export { lensKey } from '../../core/src/types';
+// The `.js` is load-bearing, however odd it looks next to a `.ts` file. Vite and
+// TypeScript both resolve this without it, so it compiled and bundled fine — but the
+// server compiles this same file to ESM and runs it under Node, which requires the
+// extension and fails at import time with a bare ERR_MODULE_NOT_FOUND. It stayed
+// hidden while only the CLI exporter reached this module; the moment an HTTP route
+// did, the server stopped booting.
+export { lensKey } from '../../core/src/types.js';
 
 /** Chess's own annotation vocabulary is the icon set. */
 export const GLYPH: Record<Classification, string> = {

@@ -15,6 +15,7 @@
  * specification; where the two disagree, that one is right.
  */
 import { analyseGame } from '../../../core/src/analysis.js';
+import { buildSnapshot } from '../snapshot-build.js';
 import { configureChessCom } from '../../../core/src/chesscom.js';
 import { getSetting, migrate, setSetting, type DB } from '../../../core/src/db.js';
 import { parseEco, parseLens, parseScope } from '../../../core/src/lens.js';
@@ -278,6 +279,20 @@ async function route(request: WorkerRequest): Promise<unknown> {
         },
       );
       return { jobId: job.id };
+    }
+
+    /**
+     * The phone writing its own snapshot.
+     *
+     * On a device with no computer behind it this database is the only copy of the
+     * games, so being able to hand it back out is the whole of its backup story —
+     * and the same file seeds another device, which is how a phone hands over to a
+     * new phone without either of them re-analysing anything.
+     */
+    if (tail === 'export') {
+      return await buildSnapshot(handle, player.username, {
+        defaultDepth: String(depthSetting(handle)),
+      });
     }
 
     const lens = parseLens(Object.fromEntries(url.searchParams));

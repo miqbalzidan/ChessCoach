@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api';
 import { ErrorNote, Loading } from '../components/Chrome';
-import { relativeTime } from '../format';
-import { inSnapshotMode } from '../snapshot';
+import { pluralise, relativeTime } from '../format';
+import { downloadSnapshot, inSnapshotMode } from '../snapshot';
 import { SnapshotSettings } from './SnapshotSettings';
 import { LocalDevice } from './LocalDevice';
 import type { Job, Settings as SettingsData } from '../types';
@@ -25,6 +25,8 @@ export function Settings({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
+  /** The username currently being exported, so only its own button says so. */
+  const [exporting, setExporting] = useState<string | null>(null);
 
   useEffect(() => {
     if (snapshot) return;
@@ -67,6 +69,33 @@ export function Settings({
       </>
     );
   }
+
+  /**
+   * Hand this player's analysis over as a file.
+   *
+   * The counterpart of "start from a computer's export" two sections down: that
+   * reads one of these, this writes one. Building the snapshot is the same work the
+   * CLI exporter does, so the file is the same file — it just no longer needs a
+   * terminal to produce, which is the difference between a laptop being able to feed
+   * a phone and only being able to in principle.
+   */
+  const exportPlayer = async (username: string) => {
+    setExporting(username);
+    setError(null);
+    setStatus(null);
+    try {
+      const snapshot = await api.exportSnapshot(username);
+      const name = await downloadSnapshot(snapshot);
+      setStatus(
+        `Saved ${name} — ${pluralise(snapshot.games.length, 'game')}. ` +
+          "Open it on the other device under Settings → start from a computer's export.",
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not export');
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const saveDepth = async (next: number) => {
     setDepth(next);
@@ -158,6 +187,14 @@ export function Settings({
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={exporting !== null}
+                  onClick={() => void exportPlayer(player.username)}
+                >
+                  {exporting === player.username ? 'exporting…' : 'export analysis'}
+                </button>
                 <button
                   type="button"
                   className="btn btn-ghost"

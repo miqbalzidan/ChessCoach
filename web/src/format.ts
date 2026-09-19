@@ -1,4 +1,4 @@
-import type { Classification, Scope } from './types';
+import type { Classification, Scope } from './types.js';
 
 export function formatEval(cp: number, mate: number | null): string {
   if (mate !== null) return mate > 0 ? `M${mate}` : `-M${Math.abs(mate)}`;

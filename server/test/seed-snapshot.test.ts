@@ -16,7 +16,7 @@ import { dashboard, openings } from '../../core/src/stats.js';
 import { detectPatterns } from '../../core/src/patterns.js';
 import { profile } from '../../core/src/profile.js';
 import { listGames, upsertPlayer } from '../../core/src/store.js';
-import { buildSnapshot } from '../src/export.js';
+import { buildSnapshot } from '../../web/src/snapshot-build.js';
 import type { Lens } from '../../core/src/types.js';
 
 function freshDb(): DB {
