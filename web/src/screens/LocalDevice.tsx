@@ -10,8 +10,8 @@
  * It is just an afternoon and a flat battery, so the screen says so before rather
  * than after.
  */
-import { useRef, useState } from 'react';
-import { inLocalMode, seedFromFile, setLocalMode } from '../engine/local';
+import { useEffect, useRef, useState } from 'react';
+import { inLocalMode, seedFromFile, setLocalMode, storageIsPersistent } from '../engine/local';
 import { readSnapshotFile } from '../snapshot';
 import { pluralise } from '../format';
 
@@ -20,7 +20,22 @@ export function LocalDevice({ onSeeded }: { onSeeded: () => void }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [persistent, setPersistent] = useState<boolean | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // Asked once, on the screen that offers to make this device the whole app. If the
+  // answer is no, saying so here is the difference between someone learning it now
+  // and learning it after an evening of analysis disappears.
+  useEffect(() => {
+    if (!local) return;
+    let live = true;
+    void storageIsPersistent().then((value) => {
+      if (live) setPersistent(value);
+    });
+    return () => {
+      live = false;
+    };
+  }, [local]);
 
   function toggle(next: boolean): void {
     setLocalMode(next);
@@ -57,6 +72,18 @@ export function LocalDevice({ onSeeded }: { onSeeded: () => void }) {
         <div className="label">this device</div>
         <div className="meta">{local ? 'analysing here' : 'using a server'}</div>
       </div>
+
+      {local && persistent === false && (
+        <div className="import-warning">
+          <strong>Nothing you import here will be saved.</strong> This browser will not
+          give the app durable storage, which is almost always because the page was
+          opened over <code>http://</code> at an address like{' '}
+          <code>http://192.168.1.5:5400</code>. Everything works — imports, analysis,
+          the whole sheet — until you reload, and then it is gone. Open the app over{' '}
+          <code>https://</code> (or install it from an <code>https://</code> address)
+          and it will keep your games on this device properly.
+        </div>
+      )}
 
       <div className="prose snapshot-body">
         {local ? (

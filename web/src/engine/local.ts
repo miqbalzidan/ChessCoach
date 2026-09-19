@@ -121,3 +121,25 @@ export async function estimateImport(
     return null;
   }
 }
+
+/**
+ * Will anything imported here survive a reload?
+ *
+ * False means the database is in memory: the browser refused OPFS, which on a phone
+ * almost always means the page was opened over plain `http://` on a LAN address
+ * rather than over `https://` or `localhost`. Everything works, analysis included,
+ * and then vanishes on the next reload — so the screens ask this and say so, rather
+ * than letting someone spend an evening analysing into a void.
+ *
+ * Null when the question could not be answered (no local mode, or the Worker failed
+ * to start); callers should stay quiet in that case rather than raise a false alarm.
+ */
+export async function storageIsPersistent(): Promise<boolean | null> {
+  if (!inLocalMode()) return null;
+  try {
+    const settings = await requestLocal<{ persistent?: boolean }>('/settings');
+    return settings.persistent ?? null;
+  } catch {
+    return null;
+  }
+}

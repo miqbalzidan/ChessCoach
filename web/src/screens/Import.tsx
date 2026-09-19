@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
-import { estimateImport, inLocalMode } from '../engine/local';
+import { estimateImport, inLocalMode, storageIsPersistent } from '../engine/local';
 import { pluralise } from '../format';
 import { splitPgns } from '../../../core/src/importer';
 import { TIME_CLASSES, type Job, type TimeClass } from '../types';
@@ -26,6 +26,8 @@ export function Import({ onImported }: { onImported: (username: string) => void 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [estimate, setEstimate] = useState<{ games: number; seconds: number } | null>(null);
+  /** Null until asked, and only ever false on a device that refused durable storage. */
+  const [persistent, setPersistent] = useState<boolean | null>(null);
   /** A picked .pgn is held here rather than in the textarea: an exported archive can
    *  be hundreds of kilobytes, and putting that through a controlled input makes a
    *  phone crawl for no benefit — nobody reads a year of PGN in a text box. */
@@ -60,6 +62,23 @@ export function Import({ onImported }: { onImported: (username: string) => void 
       window.clearTimeout(timer);
     };
   }, [local, gameCount]);
+
+  /**
+   * Whether this device will keep what the import produces. Asked here as well as in
+   * Settings because this is the screen where the loss would actually happen: an
+   * import into a memory-only database runs perfectly and then evaporates, and the
+   * moment to learn that is before spending the battery, not after.
+   */
+  useEffect(() => {
+    if (!local) return;
+    let live = true;
+    void storageIsPersistent().then((value) => {
+      if (live) setPersistent(value);
+    });
+    return () => {
+      live = false;
+    };
+  }, [local]);
 
   // Progress is polled rather than streamed: an import is a handful of stage
   // changes over minutes, which does not justify a socket.
@@ -271,6 +290,19 @@ export function Import({ onImported }: { onImported: (username: string) => void 
               onChange={(event) => setPgn(event.target.value)}
             />
           </label>
+        )}
+
+        {local && persistent === false && !busy && (
+          <div className="import-warning">
+            <div className="import-warning-time">This will not be saved.</div>
+            <div className="prose">
+              This browser will not give the app durable storage, so the import will run,
+              the analysis will be right, and all of it will disappear when you reload or
+              close the tab. That happens when the page is opened over <code>http://</code>{' '}
+              at an address like <code>http://192.168.1.5:5400</code>. Open it over{' '}
+              <code>https://</code> instead and your games stay on this device.
+            </div>
+          </div>
         )}
 
         {longImport && !busy && (

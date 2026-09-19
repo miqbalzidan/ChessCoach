@@ -261,6 +261,10 @@ export interface Settings {
   engines: number;
   coaching: 'claude' | 'offline';
   players: Player[];
+  /** Only sent by the in-browser copy of the app, and only it can be false: a
+   *  server's disk does not evaporate. False means this browser refused OPFS and
+   *  the database is in memory, so nothing imported here outlives a reload. */
+  persistent?: boolean;
 }
 
 export interface Trait {
