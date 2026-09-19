@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { BaselineBars } from '../components/BaselineBars';
+import { Verdict } from '../components/Verdict';
 import {
   Empty,
   ErrorNote,
@@ -14,6 +15,7 @@ import {
 import { pluralise, relativeTime, scopeLabel, signed } from '../format';
 import { lensKey } from '../types';
 import type {
+  Classification,
   AnalysisSource,
   Coaching,
   Dashboard as DashboardData,
@@ -311,7 +313,10 @@ export function Dashboard({
                   >
                     <div className={`glyph glyph-${severityOf(pattern)}`}>{pattern.glyph}</div>
                     <div>
-                      <div className="pattern-title">{pattern.title}</div>
+                      <div className="pattern-head">
+                        <span className="pattern-title">{pattern.title}</span>
+                        <Verdict classification={severityOf(pattern)} />
+                      </div>
                       <div className="prose" style={{ marginTop: 6, maxWidth: '56ch' }}>
                         {note?.explanation ?? pattern.mechanism}
                       </div>
@@ -599,7 +604,7 @@ function describeSources(sources: AnalysisSource[]): string {
   )}`;
 }
 
-function severityOf(pattern: Pattern): string {
+function severityOf(pattern: Pattern): Classification {
   if (pattern.glyph === '??') return 'blunder';
   if (pattern.glyph === '?') return 'mistake';
   return 'inaccuracy';

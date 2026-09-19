@@ -1,5 +1,5 @@
 /**
- * Pulls the three typefaces down from Google Fonts and self-hosts them.
+ * Pulls the four typefaces down from Google Fonts and self-hosts them.
  *
  * Two reasons, and the second is the one that matters: a snapshot opened on a phone
  * with no network must still look like the thing that was designed. The display face
@@ -17,7 +17,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const CSS_URL =
-  'https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;0,6..96,800;1,6..96,400;1,6..96,600&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap';
+  'https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;0,6..96,800;1,6..96,400;1,6..96,600&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap';
 
 // Asking as a current browser is what gets woff2 rather than a legacy format.
 const UA =

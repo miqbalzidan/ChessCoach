@@ -8,12 +8,21 @@ describe('chesscomAnalysisUrl', () => {
   test('turns a game link into its analysis link', () => {
     assert.equal(
       chesscomAnalysisUrl('https://www.chess.com/game/live/123456789'),
-      'https://www.chess.com/analysis/game/live/123456789?tab=review',
+      'https://www.chess.com/analysis/game/live/123456789?tab=analysis',
     );
     assert.equal(
       chesscomAnalysisUrl('https://chess.com/game/daily/42'),
-      'https://www.chess.com/analysis/game/daily/42?tab=review',
+      'https://www.chess.com/analysis/game/daily/42?tab=analysis',
     );
+  });
+
+  test('opens the board, not Game Review', () => {
+    // Game Review is Chess.com's own coached walkthrough: an animation, a paywall,
+    // and a second opinion on the game this sheet has already explained. Following
+    // a leak should land on a board you can push pieces around on.
+    const url = chesscomAnalysisUrl('https://www.chess.com/game/live/1');
+    assert.ok(url && !url.includes('tab=review'), `still opens Game Review: ${url}`);
+    assert.ok(url.includes('tab=analysis'));
   });
 
   test('offers nothing rather than a guess for anything else', () => {

@@ -34,6 +34,25 @@ export const GLYPH: Record<Classification, string> = {
   blunder: '??',
 };
 
+/**
+ * The same judgements in words.
+ *
+ * `??` is only obvious if you already read chess annotation, and someone looking at
+ * their own mistakes for the first time is exactly the person who does not. The
+ * glyph stays — it is compact enough for a move list 80 rows long, and it is what a
+ * chess player expects — but anywhere there is room for a word, the word goes with
+ * it.
+ */
+export const VERDICT: Record<Classification, string> = {
+  brilliant: 'Brilliant',
+  best: 'Best',
+  excellent: 'Excellent',
+  good: 'Good',
+  inaccuracy: 'Inaccuracy',
+  mistake: 'Mistake',
+  blunder: 'Blunder',
+};
+
 export interface Player {
   id: number;
   username: string;
