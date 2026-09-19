@@ -23,7 +23,12 @@ class, with a plain-language coaching layer on top.
 - Pieces slide, and moves, captures and checks each sound different — synthesised in
   the browser, so no audio files and nothing to download
 - Right-click a square to highlight it, right-drag for an arrow, left-click to clear
-- A link straight to the game's analysis board on Chess.com when it came from there
+- **analyse** — the position on the board, opened on a free analysis board with an
+  engine. This one goes to Lichess, for a reason worth knowing: on a phone the
+  Chess.com app claims chess.com links and routes them to Game Review no matter what
+  the URL asks for, so a Chess.com link cannot reliably open a board there.
+- **chess.com** — the game itself, when it came from there. On a phone this opens the
+  Chess.com app, which decides for itself which screen you land on.
 
 **V2 — cross-game statistics**
 

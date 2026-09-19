@@ -13,7 +13,7 @@ import {
   timeControlLabel,
 } from '../format';
 import { playMoveSound, setSoundEnabled, soundEnabled } from '../sound';
-import { chesscomAnalysisUrl, lessonFor, motifsOf } from '../links';
+import { analysisBoardUrl, chesscomAnalysisUrl, lessonFor, motifsOf } from '../links';
 import { GLYPH, VERDICT, type Classification, type Game, type Move } from '../types';
 import { Verdict } from '../components/Verdict';
 
@@ -125,7 +125,12 @@ export function Review() {
   const opponentAccuracy =
     playerColor === 'white' ? game.accuracy_black : game.accuracy_white;
 
-  const analysisUrl = chesscomAnalysisUrl(game.url);
+  // Two ways out, because they do different jobs and only one of them is dependable
+  // on a phone. `boardUrl` opens the position currently on this board, on a site the
+  // Chess.com app does not intercept. `gameUrl` opens the game itself, which on a
+  // phone means the Chess.com app's own screen for it — see the note in links.ts.
+  const boardUrl = analysisBoardUrl(fen, playerColor);
+  const gameUrl = chesscomAnalysisUrl(game.url);
 
   // The board is drawn from the player's side, so the far strip is the opponent's
   // whenever the player is at the bottom — which is always, by construction.
@@ -219,12 +224,24 @@ export function Review() {
             >
               {sound ? 'sound on' : 'sound off'}
             </button>
-            {analysisUrl && (
+            {boardUrl && (
               <a
                 className="btn btn-ghost btn-sm"
-                href={analysisUrl}
+                href={boardUrl}
                 target="_blank"
                 rel="noreferrer noopener"
+                title="Open this position on a free analysis board"
+              >
+                analyse ↗
+              </a>
+            )}
+            {gameUrl && (
+              <a
+                className="btn btn-ghost btn-sm"
+                href={gameUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                title="Open the game on Chess.com"
               >
                 chess.com ↗
               </a>

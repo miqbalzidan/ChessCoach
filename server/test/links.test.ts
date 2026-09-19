@@ -1,6 +1,12 @@
 import { strict as assert } from 'node:assert';
 import { test, describe } from 'node:test';
-import { chesscomAnalysisUrl, LESSONS, lessonFor, motifsOf } from '../../web/src/links.js';
+import {
+  analysisBoardUrl,
+  chesscomAnalysisUrl,
+  LESSONS,
+  lessonFor,
+  motifsOf,
+} from '../../web/src/links.js';
 import { soundForSan } from '../../web/src/format.js';
 import { MOTIF_LABELS } from '../../core/src/motifs.js';
 
@@ -16,10 +22,13 @@ describe('chesscomAnalysisUrl', () => {
     );
   });
 
-  test('opens the board, not Game Review', () => {
+  test('asks for the board, not Game Review', () => {
     // Game Review is Chess.com's own coached walkthrough: an animation, a paywall,
-    // and a second opinion on the game this sheet has already explained. Following
-    // a leak should land on a board you can push pieces around on.
+    // and a second opinion on the game this sheet has already explained.
+    //
+    // This only holds in a browser. On a phone the Chess.com app claims the link
+    // before the page loads and routes by path, so `tab` never reaches anything that
+    // reads it — which is what `analysisBoardUrl` exists to work around.
     const url = chesscomAnalysisUrl('https://www.chess.com/game/live/1');
     assert.ok(url && !url.includes('tab=review'), `still opens Game Review: ${url}`);
     assert.ok(url.includes('tab=analysis'));
@@ -32,6 +41,47 @@ describe('chesscomAnalysisUrl', () => {
     assert.equal(chesscomAnalysisUrl('https://lichess.org/abcd1234'), null);
     assert.equal(chesscomAnalysisUrl('https://notchess.com/game/live/1'), null);
     assert.equal(chesscomAnalysisUrl('https://www.chess.com/member/someone'), null);
+  });
+});
+
+describe('analysisBoardUrl', () => {
+  const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+  test('puts the position in the path, underscores for spaces', () => {
+    // Lichess's documented scheme. Slashes stay slashes — percent-encoding them
+    // gives a path the router does not recognise.
+    assert.equal(
+      analysisBoardUrl(START, 'white'),
+      'https://lichess.org/analysis/standard/' +
+        'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR_w_KQkq_-_0_1?color=white',
+    );
+  });
+
+  test('opens the board from the side the player was on', () => {
+    const url = analysisBoardUrl(START, 'black');
+    assert.ok(url?.endsWith('?color=black'), url ?? 'no url');
+  });
+
+  test('goes nowhere the Chess.com app can intercept', () => {
+    // The whole point: an App Link on chess.com is handed to the installed app,
+    // which routes by path and opens Game Review whatever the query string says.
+    // This link has to be on a host that app does not claim.
+    const url = analysisBoardUrl(START);
+    assert.ok(url && !/chess\.com/i.test(url), `back on chess.com: ${url}`);
+  });
+
+  test('a four-field FEN is enough; clocks are optional', () => {
+    assert.ok(analysisBoardUrl('8/8/8/8/8/8/8/K6k w - -'));
+  });
+
+  test('offers nothing rather than a malformed URL', () => {
+    assert.equal(analysisBoardUrl(null), null);
+    assert.equal(analysisBoardUrl(''), null);
+    assert.equal(analysisBoardUrl('not a fen'), null);
+    // Seven ranks, not eight.
+    assert.equal(analysisBoardUrl('8/8/8/8/8/8/K6k w - - 0 1'), null);
+    // Nothing that could carry a query or a second path segment out of the FEN.
+    assert.equal(analysisBoardUrl('8/8/8/8/8/8/8/K6k w - - 0 1?evil=1'), null);
   });
 });
 
