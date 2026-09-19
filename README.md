@@ -158,7 +158,22 @@ hostname -I                       # macOS: ipconfig getifaddr en0
 
 Then `http://<that-address>:8787` on the phone (`:5173` under `npm run dev`). Use the IP
 rather than a hostname; Vite rejects unknown hostnames unless they are in
-`server.allowedHosts`. In Chrome, **⋮ → Add to Home screen** installs it standalone.
+`server.allowedHosts`.
+
+**This route reads; it does not install.** A plain `http://` address that is not
+`localhost` is not a secure context, and browsers withhold service workers, the cache
+API and OPFS from those pages. Measured in Chromium against the built site:
+`http://<LAN IP>:5400` reports `isSecureContext: false` and has no
+`navigator.serviceWorker` and no `navigator.storage.getDirectory` at all. So there is
+nothing to install and nothing to work offline — the sheet renders, because the
+computer's server is answering, and that is the whole point of this section.
+
+It also means **"run everything on this device" over a LAN address will not keep your
+games**: with no OPFS the database falls back to memory, so an import analyses
+correctly and then vanishes on reload. The app now says so on both Settings and
+Import rather than letting you find out. For a phone that stores its own games, use an
+`https://` address — publish to Pages as above, which is the reason that section
+exists.
 
 ### No Chess.com access?
 
