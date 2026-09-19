@@ -811,6 +811,77 @@ a {
   background: var(--wash);
 }
 
+/* ---------- the game library ----------
+   Six columns of fixed widths, which is right on a desktop and impossible on a
+   phone: 92 + 118 + 92 + 92 + 84, five 16px gaps and two 34px margins want 666px
+   before the opponent's name gets any. It used to be an inline style, so no media
+   query could reach it — the table simply ran off the side of the screen. */
+
+.game-row {
+  grid-template-columns: 92px 1fr 118px 92px 92px 84px;
+}
+
+.game-accuracy,
+.game-analysis {
+  text-align: right;
+}
+
+.game-accuracy {
+  font: 600 17px/1 var(--display);
+}
+
+.game-result {
+  font: 600 12px/1 var(--mono);
+}
+
+@media (max-width: 720px) {
+  /* Two columns and two rows: who and what on the left, how it went on the right.
+     Nothing is dropped — the same six facts are still there, arranged as a card
+     rather than a spreadsheet, because a row you have to scroll sideways to finish
+     reading is worse than one that takes two lines. */
+  .game-row {
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    align-items: start;
+  }
+
+  .game-date {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .game-opponent {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .game-opening {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .game-result {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+
+  .game-accuracy {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .game-analysis {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  /* The header names columns that no longer exist side by side. */
+  .row-head.game-row {
+    display: none;
+  }
+}
+
 /* ---------- openings ---------- */
 
 .openings {
