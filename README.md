@@ -134,11 +134,16 @@ and it is worth following where you can:
 | 50 games | a few minutes | under a minute |
 | a back archive (300) | the best part of an hour | a few minutes |
 
-So: analyse the archive on a computer, `npm run export`, and open the
-`.leaksheet.json.gz` under **Settings → start from a computer's export**. Those games
+So: analyse the archive on a computer, press **export analysis** beside that account
+in **Settings** (or run `npm run export` if you prefer a terminal), and open the
+`.leaksheet.json.gz` it saves under **Settings → start from a computer's export**. Those games
 arrive already analysed, at the depth the computer used — 44 games seed in about a
 second — and from then on the phone only has to keep up with what you play. Opening a
 newer export later adds just the games since.
+
+The phone can write one of these as well, from the same button. On a device with no
+computer behind it that database is the only copy of your games, so exporting is the
+only backup there is — and the file seeds a new phone without re-analysing anything.
 
 Getting games onto the phone in the first place: **open a `.pgn` file**. Chess.com
 will hand you your whole archive as a download, and the Import screen takes it without

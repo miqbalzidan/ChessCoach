@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { Board } from '../components/Board';
+import { Verdict } from '../components/Verdict';
 import { lessonFor } from '../links';
 import {
   Empty,
@@ -13,7 +14,15 @@ import {
 } from '../components/Chrome';
 import { formatClock, formatDate, pluralise } from '../format';
 import { lensKey } from '../types';
-import type { Coaching, Lens, OpeningRow, Pattern, Scope, TimeClassSummary } from '../types';
+import type {
+  Classification,
+  Coaching,
+  Lens,
+  OpeningRow,
+  Pattern,
+  Scope,
+  TimeClassSummary,
+} from '../types';
 
 export function Patterns({
   username,
@@ -224,7 +233,7 @@ function PatternCard({
   onToggle: () => void;
   onOpenGame: (gameId: number) => void;
 }) {
-  const severity =
+  const severity: Classification =
     pattern.glyph === '??' ? 'blunder' : pattern.glyph === '?' ? 'mistake' : 'inaccuracy';
 
   return (
@@ -237,7 +246,10 @@ function PatternCard({
       >
         <div className={`glyph glyph-${severity}`}>{pattern.glyph}</div>
         <div>
-          <div className="pattern-title">{pattern.title}</div>
+          <div className="pattern-head">
+            <span className="pattern-title">{pattern.title}</span>
+            <Verdict classification={severity} />
+          </div>
           <div className="prose" style={{ marginTop: 6, maxWidth: '58ch' }}>
             {note?.explanation ?? pattern.mechanism}
           </div>

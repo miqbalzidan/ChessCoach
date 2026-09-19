@@ -24,12 +24,35 @@
   --wash: rgba(195, 66, 31, 0.06);
   --wash-strong: rgba(195, 66, 31, 0.09);
 
+  /* Move quality, as a scale rather than one accent. The sheet's rule is that
+     vermilion means the player's own mistake, and that still holds — blunder keeps
+     it. The rest fan out from there so the four verdicts are told apart at a glance
+     instead of by reading `??` against `?`. Each pale is the same hue at ~12%, for
+     the badge behind the word. */
+  --sev-blunder: #c3421f;
+  --sev-blunder-pale: rgba(195, 66, 31, 0.13);
+  --sev-mistake: #b0563a;
+  --sev-mistake-pale: rgba(176, 86, 58, 0.14);
+  --sev-inaccuracy: #8a6d1f;
+  --sev-inaccuracy-pale: rgba(138, 109, 31, 0.15);
+  --sev-good: #4a463a;
+  --sev-good-pale: rgba(74, 70, 58, 0.10);
+  --sev-brilliant: #2f6b4f;
+  --sev-brilliant-pale: rgba(47, 107, 79, 0.13);
+
   --board-light: #efeadd;
   --board-dark: #b9a988;
   --mark: #3f7d8c;
   --piece-white: #f6f1e4;
 
   --display: 'Bodoni Moda', 'Didot', 'Playfair Display', Georgia, 'Times New Roman', serif;
+  /* The interface face. Monospace was carrying nearly all of the chrome, which suits
+     a scoresheet's look and is genuinely tiring to read a paragraph of — every letter
+     the same width is the point of a monospace and the cost of it. Plex Sans is the
+     same superfamily as the mono, so the pairing holds together, and it is humanist
+     enough not to read as a generic UI sans. Mono stays where the fixed width is
+     doing work: chess notation, PGN, figures that have to line up. */
+  --ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
   --prose: 'Spectral', Georgia, 'Times New Roman', serif;
 
@@ -49,7 +72,7 @@ body {
 body {
   background: var(--bone);
   color: var(--ink);
-  font-family: var(--mono);
+  font-family: var(--ui);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -69,21 +92,21 @@ a {
 /* ---------- typography primitives ---------- */
 
 .label {
-  font: 600 10px/1 var(--mono);
+  font: 600 10px/1 var(--ui);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .label-sm {
-  font: 600 9px/1 var(--mono);
+  font: 600 9px/1 var(--ui);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .meta {
-  font: 400 11px/1.6 var(--mono);
+  font: 400 11px/1.6 var(--ui);
   color: var(--muted-2);
 }
 
@@ -127,7 +150,7 @@ a {
 }
 
 .masthead-title {
-  font: 600 11px/1 var(--mono);
+  font: 600 11px/1 var(--ui);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--vermilion);
@@ -137,7 +160,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  font: 400 10.5px/1 var(--mono);
+  font: 400 10.5px/1 var(--ui);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -183,7 +206,7 @@ a {
 .headline-aside {
   border-left: 1px solid var(--rule);
   padding-left: 18px;
-  font: 400 12px/1.7 var(--mono);
+  font: 400 12px/1.7 var(--ui);
   color: var(--ink-2);
 }
 
@@ -198,7 +221,7 @@ a {
 }
 
 .band-label {
-  font: 600 10px/1 var(--mono);
+  font: 600 10px/1 var(--ui);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
@@ -212,7 +235,7 @@ a {
   border: 0;
   border-left: 1px solid var(--rule);
   padding: 13px 4px 11px;
-  font: 600 12px/1 var(--mono);
+  font: 600 12px/1 var(--ui);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   background: transparent;
@@ -266,7 +289,7 @@ a {
   border: 0;
   border-left: 1px solid var(--rule);
   padding: 8px 12px;
-  font: 600 12px/1.3 var(--mono);
+  font: 600 12px/1.3 var(--ui);
   letter-spacing: 0.06em;
   color: var(--ink);
 }
@@ -281,7 +304,7 @@ a {
   border: 0;
   background: transparent;
   padding: 8px 0;
-  font: 600 10px/1 var(--mono);
+  font: 600 10px/1 var(--ui);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--vermilion);
@@ -349,7 +372,7 @@ a {
 }
 
 .stat-note {
-  font: 400 11.5px/1.5 var(--mono);
+  font: 400 11.5px/1.5 var(--ui);
   color: var(--ink-2);
   margin-top: 8px;
 }
@@ -382,7 +405,7 @@ a {
   display: flex;
   justify-content: space-between;
   margin-top: 8px;
-  font: 400 11px/1.5 var(--mono);
+  font: 400 11px/1.5 var(--ui);
   color: var(--ink-2);
   gap: 8px;
 }
@@ -496,34 +519,113 @@ a {
 }
 
 .glyph-blunder {
-  color: var(--vermilion);
+  color: var(--sev-blunder);
 }
 
 .glyph-mistake {
-  color: var(--amber);
+  color: var(--sev-mistake);
 }
 
 .glyph-inaccuracy {
-  color: var(--muted-3);
+  color: var(--sev-inaccuracy);
 }
 
 .glyph-brilliant {
-  color: #2f6b4f;
+  color: var(--sev-brilliant);
+}
+
+/*
+ * The verdict, spelled out.
+ *
+ * Wherever there is room for a word, the glyph does not have to carry the meaning on
+ * its own. Colour and word say the same thing twice on purpose: the colour is what
+ * you catch scanning, the word is what you can act on, and either one alone fails
+ * somebody — the glyph for a reader who does not know the notation, the colour for a
+ * reader who cannot distinguish these hues.
+ */
+.verdict {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 9px 4px;
+  border-radius: 2px;
+  font: 600 12px/1.1 var(--ui);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--sev-good);
+  background: var(--sev-good-pale);
+}
+
+.verdict-glyph {
+  font: 600 13px/1 var(--display);
+  opacity: 0.85;
+}
+
+.verdict-blunder {
+  color: var(--sev-blunder);
+  background: var(--sev-blunder-pale);
+}
+
+.verdict-mistake {
+  color: var(--sev-mistake);
+  background: var(--sev-mistake-pale);
+}
+
+.verdict-inaccuracy {
+  color: var(--sev-inaccuracy);
+  background: var(--sev-inaccuracy-pale);
+}
+
+.verdict-brilliant {
+  color: var(--sev-brilliant);
+  background: var(--sev-brilliant-pale);
 }
 
 .pattern-title {
   font: 600 21px/1.25 var(--display);
 }
 
+/* Title and verdict share a baseline and wrap together on a narrow screen, so the
+   badge never ends up orphaned on its own line above the name it describes. */
+/* The move-list filters name the verdict they select and carry its colour, so the
+   row of tabs reads as a severity scale rather than four kinds of punctuation. */
+.filter-name {
+  font: 600 9.5px/1.1 var(--ui);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filter-glyph {
+  font: 600 12px/1 var(--display);
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+.pattern-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+/* In the run of text under the board the badge sits on the text baseline rather
+   than floating above it. */
+.verdict-inline {
+  transform: translateY(1px);
+}
+
 .pattern-meta {
-  font: 400 11px/1 var(--mono);
+  font: 400 11px/1 var(--ui);
   color: var(--muted-2);
   margin-top: 10px;
 }
 
 .pattern-cost {
   text-align: right;
-  font: 400 11px/1.6 var(--mono);
+  font: 400 11px/1.6 var(--ui);
   color: var(--ink-2);
 }
 
@@ -553,7 +655,7 @@ a {
   grid-template-columns: 62px 1fr 34px;
   gap: 10px;
   align-items: center;
-  font: 400 11px/1 var(--mono);
+  font: 400 11px/1 var(--ui);
   color: rgba(232, 226, 212, 0.6);
 }
 
@@ -583,7 +685,7 @@ a {
   background: var(--vermilion);
   color: #fff;
   padding: 13px 22px;
-  font: 600 10.5px/1 var(--mono);
+  font: 600 10.5px/1 var(--ui);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -625,7 +727,7 @@ a {
 }
 
 .field-label {
-  font: 600 10px/1 var(--mono);
+  font: 600 10px/1 var(--ui);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
@@ -640,6 +742,7 @@ a {
   background: var(--paper);
   border: 1px solid var(--rule);
   padding: 13px 14px;
+  /* A pasted PGN is notation, not prose — it wants the fixed width. */
   font: 400 14px/1.4 var(--mono);
   color: var(--ink);
 }
@@ -706,6 +809,77 @@ a {
 
 .row:hover {
   background: var(--wash);
+}
+
+/* ---------- the game library ----------
+   Six columns of fixed widths, which is right on a desktop and impossible on a
+   phone: 92 + 118 + 92 + 92 + 84, five 16px gaps and two 34px margins want 666px
+   before the opponent's name gets any. It used to be an inline style, so no media
+   query could reach it — the table simply ran off the side of the screen. */
+
+.game-row {
+  grid-template-columns: 92px 1fr 118px 92px 92px 84px;
+}
+
+.game-accuracy,
+.game-analysis {
+  text-align: right;
+}
+
+.game-accuracy {
+  font: 600 17px/1 var(--display);
+}
+
+.game-result {
+  font: 600 12px/1 var(--mono);
+}
+
+@media (max-width: 720px) {
+  /* Two columns and two rows: who and what on the left, how it went on the right.
+     Nothing is dropped — the same six facts are still there, arranged as a card
+     rather than a spreadsheet, because a row you have to scroll sideways to finish
+     reading is worse than one that takes two lines. */
+  .game-row {
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    align-items: start;
+  }
+
+  .game-date {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .game-opponent {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .game-opening {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .game-result {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+
+  .game-accuracy {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .game-analysis {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  /* The header names columns that no longer exist side by side. */
+  .row-head.game-row {
+    display: none;
+  }
 }
 
 /* ---------- openings ---------- */
@@ -859,7 +1033,7 @@ a {
   background: var(--ink);
   color: var(--bone);
   padding: 7px 11px;
-  font: 600 12px/1 var(--mono);
+  font: 600 12px/1 var(--ui);
 }
 
 /* ---------- eval strip ---------- */
@@ -917,14 +1091,22 @@ a {
 
 .move-filter {
   flex: 1;
+  min-width: 0;
   border: 0;
   border-left: 1px solid var(--rule);
-  padding: 12px 0;
-  font: 600 11px/1 var(--mono);
+  padding: 10px 4px;
+  font: 600 11px/1 var(--ui);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   background: transparent;
   color: var(--muted-2);
+  /* Name over count, because "inaccuracy" spelled out does not share a line with a
+     number inside a quarter of a phone. Stacking keeps all four tabs the same shape
+     and stops the longest one wrapping into its neighbour. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .move-filter:first-child {
@@ -998,7 +1180,7 @@ a {
   border-left: 3px solid var(--vermilion);
   padding: 12px 16px;
   background: var(--wash);
-  font: 400 12px/1.6 var(--mono);
+  font: 400 12px/1.6 var(--ui);
   color: var(--ink-3);
 }
 
@@ -1071,7 +1253,7 @@ a {
 }
 
 .scout-heading {
-  font: 600 11px/1 var(--mono);
+  font: 600 11px/1 var(--ui);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   padding-bottom: 12px;
@@ -1099,7 +1281,7 @@ a {
 
 .trait-evidence {
   margin-top: 8px;
-  font: 400 11px/1.5 var(--mono);
+  font: 400 11px/1.5 var(--ui);
   color: var(--muted);
 }
 
@@ -1143,7 +1325,7 @@ a {
   align-items: baseline;
   gap: 9px;
   padding: 9px 2px;
-  font: 400 13px/1 var(--mono);
+  font: 400 13px/1 var(--ui);
   color: var(--ink-3);
   border-bottom: 1px solid var(--rule);
 }
@@ -1216,7 +1398,7 @@ a {
 .lesson-link {
   display: inline-block;
   margin-top: 14px;
-  font: 600 11px/1 var(--mono);
+  font: 600 11px/1 var(--ui);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--vermilion-pale);
@@ -1276,7 +1458,7 @@ a {
 /* Sits under the masthead title in a read-only sheet. Quiet, but never absent: the
    whole risk of a snapshot is reading last month's form as today's. */
 .masthead-provenance {
-  font: 400 11px/1.5 var(--mono);
+  font: 400 11px/1.5 var(--ui);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(20, 19, 15, 0.45);
@@ -1292,7 +1474,7 @@ a {
 }
 
 .snapshot-facts dt {
-  font: 400 11px/1 var(--mono);
+  font: 400 11px/1 var(--ui);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: rgba(20, 19, 15, 0.5);

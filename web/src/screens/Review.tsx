@@ -14,7 +14,8 @@ import {
 } from '../format';
 import { playMoveSound, setSoundEnabled, soundEnabled } from '../sound';
 import { chesscomAnalysisUrl, lessonFor, motifsOf } from '../links';
-import { GLYPH, type Classification, type Game, type Move } from '../types';
+import { GLYPH, VERDICT, type Classification, type Game, type Move } from '../types';
+import { Verdict } from '../components/Verdict';
 
 type Filter = 'all' | '??' | '?' | '?!';
 
@@ -303,6 +304,9 @@ export function Review() {
             <span>
               {current ? (
                 <>
+                  {current.is_player === 1 ? (
+                    <Verdict classification={current.classification} className="verdict-inline" />
+                  ) : null}{' '}
                   after <b>{current.san}</b>
                   {current.best_move_san && current.classification !== 'best' ? (
                     <> — engine played {current.best_move_san}</>
@@ -349,11 +353,23 @@ export function Review() {
                 key={option}
                 type="button"
                 className={`move-filter${filter === option ? ' is-active' : ''}`}
-                style={option === 'all' ? undefined : { font: '600 15px/1 var(--display)' }}
                 onClick={() => setFilter(option)}
                 aria-pressed={filter === option}
               >
-                {option === 'all' ? 'all' : option} {counts[option]}
+                {/* The tab says what it filters to rather than only showing the
+                    annotation, and carries the same colour as the verdict it selects
+                    — four tabs of punctuation told you nothing about which was worse. */}
+                {option === 'all' ? (
+                  <span className="filter-name">all</span>
+                ) : (
+                  <span className={`filter-name ${glyphClass(FILTER_CLASSES[option])}`}>
+                    {VERDICT[FILTER_CLASSES[option]]}
+                    <span className="filter-glyph" aria-hidden="true">
+                      {option}
+                    </span>
+                  </span>
+                )}
+                <span className="numeric">{counts[option]}</span>
               </button>
             ))}
           </div>

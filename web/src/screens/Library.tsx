@@ -6,8 +6,6 @@ import { formatDate, pluralise, timeControlLabel } from '../format';
 import { lensKey, TIME_CLASSES } from '../types';
 import type { Game, GameResult, Lens, OpeningRow, Scope } from '../types';
 
-const COLUMNS = '92px 1fr 118px 92px 92px 84px';
-
 export function Library({
   username,
   lens,
@@ -169,13 +167,13 @@ export function Library({
         </Empty>
       ) : (
         <div className="rows">
-          <div className="row-head label" style={{ gridTemplateColumns: COLUMNS }}>
+          <div className="row-head label game-row">
             <span>date</span>
             <span>opponent</span>
             <span>opening</span>
             <span>result</span>
-            <span style={{ textAlign: 'right' }}>accuracy</span>
-            <span style={{ textAlign: 'right' }}>analysis</span>
+            <span className="game-accuracy">accuracy</span>
+            <span className="game-analysis">analysis</span>
           </div>
           {games.map((game) => {
             const accuracy =
@@ -184,33 +182,27 @@ export function Library({
               <button
                 key={game.id}
                 type="button"
-                className="row"
-                style={{ gridTemplateColumns: COLUMNS }}
+                className="row game-row"
                 onClick={() => navigate(`/review/${game.id}`)}
               >
-                <span className="meta numeric">{formatDate(game.end_time)}</span>
-                <span>
+                <span className="meta numeric game-date">{formatDate(game.end_time)}</span>
+                <span className="game-opponent">
                   <span style={{ font: '600 15px/1.2 var(--display)' }}>{game.opponent}</span>
                   <span className="meta">
                     {' '}
                     {game.opponent_rating ?? ''} · as {game.player_color}
                   </span>
                 </span>
-                <span className="meta">
+                <span className="meta game-opening">
                   {game.eco ? `${game.eco}` : '—'}
                   <br />
                   {game.time_class} {timeControlLabel(game.time_control)}
                 </span>
-                <span className={`result-${game.result}`} style={{ font: '600 12px/1 var(--mono)' }}>
-                  {game.result}
-                </span>
-                <span
-                  className="numeric"
-                  style={{ textAlign: 'right', font: '600 17px/1 var(--display)' }}
-                >
+                <span className={`game-result result-${game.result}`}>{game.result}</span>
+                <span className="numeric game-accuracy">
                   {accuracy === null ? <span className="meta">—</span> : accuracy.toFixed(1)}
                 </span>
-                <span className="meta numeric" style={{ textAlign: 'right' }}>
+                <span className="meta numeric game-analysis">
                   {game.analysed_at ? `depth ${game.analysis_depth ?? '—'}` : 'pending'}
                 </span>
               </button>

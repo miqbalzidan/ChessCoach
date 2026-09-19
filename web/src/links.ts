@@ -12,15 +12,21 @@
 /**
  * Turns a Chess.com game URL into its analysis URL.
  *
- * A game lives at /game/live/123 or /game/daily/123, and the board review for it at
+ * A game lives at /game/live/123 or /game/daily/123, and the board for it at
  * /analysis/game/live/123. Anything that is not one of those shapes — another site,
  * a PGN someone pasted — gets no link rather than a guessed one.
+ *
+ * `tab=analysis`, deliberately. The other tab is Game Review, which is Chess.com's
+ * own coached walkthrough: it starts an animation, it costs a membership to finish,
+ * and it is a second opinion nobody asked for. The point of following this link is
+ * to put the position on a board and push the pieces around — this sheet has
+ * already said what went wrong.
  */
 export function chesscomAnalysisUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   const match = /^https?:\/\/(?:www\.)?chess\.com\/game\/(live|daily)\/(\d+)/i.exec(url);
   if (!match) return null;
-  return `https://www.chess.com/analysis/game/${match[1]}/${match[2]}?tab=review`;
+  return `https://www.chess.com/analysis/game/${match[1]}/${match[2]}?tab=analysis`;
 }
 
 export interface Lesson {

@@ -12,6 +12,7 @@ import type {
   Profile,
   Scope,
   Settings,
+  Snapshot,
   TimeClass,
 } from './types';
 import { inSnapshotMode, serveFromSnapshot, SnapshotError } from './snapshot';
@@ -180,6 +181,10 @@ export const api = {
     request<{ scope: Scope; lens: Lens; coaching: Coaching; cached: boolean }>(
       `/players/${encodeURIComponent(username)}/coaching?${lensQuery(lens, { refresh: String(refresh) })}`,
     ),
+
+  /** The whole analysed player, as the object an export file carries. */
+  exportSnapshot: (username: string) =>
+    request<Snapshot>(`/players/${encodeURIComponent(username)}/export`),
 
   settings: () => request<Settings>('/settings'),
 

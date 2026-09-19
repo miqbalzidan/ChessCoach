@@ -3,6 +3,7 @@ import type { DB } from './db-node.js';
 import { getSetting, setSetting } from './db-node.js';
 import type { EnginePool } from './engine-node.js';
 import { analyseGame } from '../../core/src/analysis.js';
+import { buildSnapshot } from '../../web/src/snapshot-build.js';
 import {
   createJob,
   getJob,
@@ -117,6 +118,24 @@ export function createApi(db: DB, pool: EnginePool): Router {
       db.prepare("UPDATE import_jobs SET status = 'done', stage = 'done' WHERE id = ?").run(job.id);
     });
     res.status(202).json({ jobId: job.id });
+  });
+
+  /**
+   * The whole analysed player, as the file the phone can start from.
+   *
+   * Returned as JSON rather than a gzipped download, because the caller is the app
+   * itself and the browser compresses and names the file — which keeps this endpoint
+   * the same shape as the Worker's, so one client path serves both.
+   */
+  router.get('/players/:username/export', (req, res) => {
+    const player = findPlayer(db, req.params.username);
+    if (!player) return res.status(404).json({ error: 'No such player' });
+
+    void buildSnapshot(db, player.username, { defaultDepth: String(analysisDepth(db)) })
+      .then((snapshot) => res.json(snapshot))
+      .catch((error: unknown) =>
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Export failed' }),
+      );
   });
 
   router.get('/players/:username/games', (req, res) => {
