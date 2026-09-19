@@ -17,7 +17,14 @@ import type {
 import { inSnapshotMode, serveFromSnapshot, SnapshotError } from './snapshot';
 import { inLocalMode, LocalError, requestLocal } from './engine/local';
 
-const BASE = '/api';
+/**
+ * Where the server lives, if there is one.
+ *
+ * Built from the app's own base path rather than written as `/api`: under a project
+ * page an absolute path points at the domain root, so the app would call
+ * `https://user.github.io/api/…` — not merely wrong, but outside the app entirely.
+ */
+export const API_BASE = `${import.meta.env.BASE_URL}api`;
 
 export class ApiError extends Error {
   constructor(
@@ -61,7 +68,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
   }
 
-  const response = await fetch(`${BASE}${path}`, {
+  const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   });

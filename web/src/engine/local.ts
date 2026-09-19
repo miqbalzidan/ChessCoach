@@ -27,23 +27,69 @@ export class LocalError extends Error {
   }
 }
 
-/** True when this browser is the whole app rather than a client of a server. */
-export function inLocalMode(): boolean {
+/**
+ * What the person has actually chosen, as opposed to what suits this deployment.
+ *
+ * Three states, not two. `on` and `off` are decisions someone made on the Settings
+ * screen and are never second-guessed; absent means they have not decided, which is
+ * the case on a first visit and is where `resolveLocalMode` gets to look around.
+ */
+function storedChoice(): 'on' | 'off' | null {
   try {
-    return localStorage.getItem(MODE_KEY) === 'on';
+    const value = localStorage.getItem(MODE_KEY);
+    return value === 'on' || value === 'off' ? value : null;
   } catch {
-    // Private windows and blocked storage: treat as a normal client.
-    return false;
+    // Private windows and blocked storage: no choice on record.
+    return null;
   }
 }
 
+/** Decided once at boot by `resolveLocalMode`, so the rest of the app can stay sync. */
+let decided: boolean | null = null;
+
+/** True when this browser is the whole app rather than a client of a server. */
+export function inLocalMode(): boolean {
+  if (decided !== null) return decided;
+  return storedChoice() === 'on';
+}
+
 export function setLocalMode(on: boolean): void {
+  decided = on;
   try {
-    if (on) localStorage.setItem(MODE_KEY, 'on');
-    else localStorage.removeItem(MODE_KEY);
+    localStorage.setItem(MODE_KEY, on ? 'on' : 'off');
   } catch {
     // Nothing to do; the mode simply will not be remembered.
   }
+}
+
+/**
+ * Work out, before the first render, whether this copy of the app has a server.
+ *
+ * A statically published build never does — GitHub Pages answers a POST with 405 and
+ * nothing else — so defaulting to "client of a server" there means the app greets
+ * someone with `Request failed (405)` and no hint that the thing they want is a
+ * switch two screens away. If nobody has chosen, ask the server whether it exists,
+ * and run everything here when it does not.
+ *
+ * An explicit choice always wins, so someone who turned local mode off while their
+ * computer was asleep is not flipped back on behind their back.
+ */
+export async function resolveLocalMode(apiBase: string): Promise<boolean> {
+  const choice = storedChoice();
+  if (choice !== null) {
+    decided = choice === 'on';
+    return decided;
+  }
+
+  try {
+    const response = await fetch(`${apiBase}/health`, { method: 'GET' });
+    // A static host answers with its 404 page, which is a response but not a server.
+    decided = !response.ok;
+  } catch {
+    // Nothing listening at all.
+    decided = true;
+  }
+  return decided;
 }
 
 function ensureWorker(): Worker {
