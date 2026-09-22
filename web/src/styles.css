@@ -598,10 +598,26 @@ a {
   text-overflow: ellipsis;
 }
 
+/* "Inaccuracy" is the longest of the five verdicts and the only one that runs out of
+   room. A fifth of a 320px phone is 5px short of it, so the tightening is scoped to
+   screens that narrow rather than thinned across every phone to rescue the rarest. */
+@media (max-width: 350px) {
+  .filter-name {
+    font-size: 9px;
+    letter-spacing: 0.01em;
+  }
+}
+
 .filter-glyph {
   font: 600 12px/1 var(--display);
-  margin-left: 4px;
   opacity: 0.8;
+}
+
+/* Glyph and count on one line, so the verdict above them gets the full tab width. */
+.filter-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
 }
 
 .pattern-head {
@@ -1094,7 +1110,7 @@ a {
   min-width: 0;
   border: 0;
   border-left: 1px solid var(--rule);
-  padding: 10px 4px;
+  padding: 10px 3px;
   font: 600 11px/1 var(--ui);
   letter-spacing: 0.1em;
   text-transform: uppercase;

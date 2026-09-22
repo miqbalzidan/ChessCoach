@@ -17,12 +17,19 @@ import { analysisBoardUrl, chesscomAnalysisUrl, lessonFor, motifsOf } from '../l
 import { GLYPH, VERDICT, type Classification, type Game, type Move } from '../types';
 import { Verdict } from '../components/Verdict';
 
-type Filter = 'all' | '??' | '?' | '?!';
+type Filter = 'all' | '??' | '?' | '?!' | '!!';
 
+/**
+ * The tabs run worst to best, so '!!' sits at the far end of the same scale rather
+ * than in a section of its own. A brilliancy is rare — most games have none — which
+ * is the point of giving it a tab: it is the one thing here you cannot find by
+ * scrolling, because you do not know whether there is anything to find.
+ */
 const FILTER_CLASSES: Record<Exclude<Filter, 'all'>, Classification> = {
   '??': 'blunder',
   '?': 'mistake',
   '?!': 'inaccuracy',
+  '!!': 'brilliant',
 };
 
 export function Review() {
@@ -81,6 +88,7 @@ export function Review() {
       '??': own.filter((m) => m.classification === 'blunder').length,
       '?': own.filter((m) => m.classification === 'mistake').length,
       '?!': own.filter((m) => m.classification === 'inaccuracy').length,
+      '!!': own.filter((m) => m.classification === 'brilliant').length,
     };
   }, [moves]);
 
@@ -129,6 +137,8 @@ export function Review() {
   // on a phone. `boardUrl` opens the position currently on this board, on a site the
   // Chess.com app does not intercept. `gameUrl` opens the game itself, which on a
   // phone means the Chess.com app's own screen for it — see the note in links.ts.
+  const brilliant = current?.is_player === 1 && current.classification === 'brilliant';
+
   const boardUrl = analysisBoardUrl(fen, playerColor);
   const gameUrl = chesscomAnalysisUrl(game.url);
 
@@ -325,7 +335,10 @@ export function Review() {
                     <Verdict classification={current.classification} className="verdict-inline" />
                   ) : null}{' '}
                   after <b>{current.san}</b>
-                  {current.best_move_san && current.classification !== 'best' ? (
+                  {/* Compare the moves, not the label. Keying this off `best` alone
+                      told a brilliancy "engine played Nd3+" directly after "after
+                      Nd3+" — a brilliant move IS the engine's move, by definition. */}
+                  {current.best_move_san && current.best_move_san !== current.san ? (
                     <> — engine played {current.best_move_san}</>
                   ) : null}
                   {current.clock_after !== null ? ` · ${formatClock(current.clock_after)} left` : ''}
@@ -365,7 +378,7 @@ export function Review() {
           {/* The move list filters by annotation glyph rather than asking you to
               scroll 41 moves. */}
           <div className="move-filters">
-            {(['all', '??', '?', '?!'] as Filter[]).map((option) => (
+            {(['all', '??', '?', '?!', '!!'] as Filter[]).map((option) => (
               <button
                 key={option}
                 type="button"
@@ -375,18 +388,28 @@ export function Review() {
               >
                 {/* The tab says what it filters to rather than only showing the
                     annotation, and carries the same colour as the verdict it selects
-                    — four tabs of punctuation told you nothing about which was worse. */}
+                    — tabs of bare punctuation told you nothing about which was worse. */}
                 {option === 'all' ? (
                   <span className="filter-name">all</span>
                 ) : (
                   <span className={`filter-name ${glyphClass(FILTER_CLASSES[option])}`}>
                     {VERDICT[FILTER_CLASSES[option]]}
-                    <span className="filter-glyph" aria-hidden="true">
-                      {option}
-                    </span>
                   </span>
                 )}
-                <span className="numeric">{counts[option]}</span>
+                {/* The glyph rides with the count rather than inside the name. Sharing
+                    a line with the word left "Inaccuracy" — the longest of the five —
+                    truncated to "Inaccurac…" once a fifth tab took a fifth of a phone. */}
+                <span className="filter-foot">
+                  {option === 'all' ? null : (
+                    <span
+                      className={`filter-glyph ${glyphClass(FILTER_CLASSES[option])}`}
+                      aria-hidden="true"
+                    >
+                      {option}
+                    </span>
+                  )}
+                  <span className="numeric">{counts[option]}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -424,13 +447,22 @@ export function Review() {
             )}
           </div>
 
-          {current && current.is_player === 1 && current.motifs ? (
+          {/* The panel was keyed on motifs, which only leaks carry — so a brilliancy
+              selected from its own tab explained nothing at all. A move worth a tab is
+              worth a sentence saying why. */}
+          {current && current.is_player === 1 && (current.motifs || brilliant) ? (
             <div className="ink-panel" style={{ padding: '20px 18px 22px' }}>
-              <div className="label-sm" style={{ color: 'var(--vermilion)', letterSpacing: '.2em' }}>
-                what happened here
+              <div
+                className="label-sm"
+                style={{
+                  color: brilliant ? 'var(--sev-brilliant)' : 'var(--vermilion)',
+                  letterSpacing: '.2em',
+                }}
+              >
+                {brilliant ? 'why this was brilliant' : 'what happened here'}
               </div>
               <div className="coach-prose" style={{ marginTop: 12, fontSize: 15 }}>
-                {describeMove(current)}
+                {brilliant ? describeBrilliance(current) : describeMove(current)}
               </div>
               {(() => {
                 // The first motif is the one the prose above leads with, so it is the
@@ -494,6 +526,9 @@ function labelFor(filter: Filter): string {
   if (filter === '??') return 'blunders';
   if (filter === '?') return 'mistakes';
   if (filter === '?!') return 'inaccuracies';
+  // Reads as "None of your moves in this game were brilliant." — the empty case is
+  // the normal one here, so it should sound like an ordinary sentence, not a fault.
+  if (filter === '!!') return 'brilliant';
   return 'moves';
 }
 
@@ -514,6 +549,33 @@ const MOTIF_PROSE: Record<string, string> = {
   'missed-check-tactic': 'missed a forcing check',
   'retreat-under-pressure': 'retreated instead of defending',
 };
+
+/** The piece a move moved, read off the SAN: no library, no second source of truth. */
+const PIECE_MOVED: Record<string, string> = {
+  N: 'knight',
+  B: 'bishop',
+  R: 'rook',
+  Q: 'queen',
+  K: 'king',
+};
+
+/**
+ * Why a brilliant move was brilliant.
+ *
+ * The classifier's rule is the whole explanation: material the opponent could simply
+ * take, in a position still worth playing, and the engine's own first choice anyway.
+ * So the sentence says exactly that, rather than inventing a narrative the analysis
+ * never had — there are no motifs recorded on a move that went right.
+ */
+function describeBrilliance(move: Move): string {
+  const piece = PIECE_MOVED[move.san[0] ?? ''] ?? 'pawn';
+  const offered = move.san.includes('x')
+    ? `You captured with your ${piece} knowing it could be taken straight back`
+    : `You put your ${piece} where it could be taken`;
+  const endorsed = ', and the engine played the same move';
+  const held = `. The position after it: ${formatEval(move.eval_after, move.mate_after)}`;
+  return `${offered}${endorsed}${held}.`;
+}
 
 function describeMove(move: Move): string {
   const motifs = move.motifs
