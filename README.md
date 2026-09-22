@@ -251,8 +251,31 @@ are converted to a win probability with the standard logistic curve first, and t
 **Forced moves are never mistakes.** If there was one legal move, it is not a blunder no
 matter what it cost.
 
-**Brilliant means a sacrifice the engine would play** — material given up, still the top
-engine move, in a position that is not already won.
+**Brilliant means a sacrifice the engine would play** — material the opponent could
+profitably take, still the top engine move, in a position that is not already won.
+
+"Could take" is settled by a full exchange evaluation on the square, read off the
+opponent's *legal* moves. That matters more than it sounds. The obvious shortcut —
+ask which pieces attack the square — counts pinned pieces and, far more often, an enemy
+king standing beside a square its own side defends, which cannot capture into check. A
+bishop giving check from a square the king may not enter is perfectly safe, and used to
+read as a piece thrown away. Swapping the square off to the end also catches the
+opposite error: Morphy's 13. Rxd7 in the Opera Game only shows its cost four ply in, so
+a rule that looks one recapture deep cannot see the most famous sacrifice in chess.
+
+**Verdicts can be recomputed without the engine.** Every input to a verdict — both
+evaluations, the move played, the engine's choice, the positions either side — is
+already a column in the database, so a change to these rules does not mean re-analysing
+the archive:
+
+```
+npm run reclassify              # say what would change
+npm run reclassify -- --write   # change it
+```
+
+Reporting is the default because this rewrites a column you cannot regenerate without
+running Stockfish over every game again. It only ever touches the verdict; accuracy
+comes from win-percentage loss and does not move.
 
 **Phase is read off the board**, not the move number: a queenless four-piece position is
 an endgame on move 18 as much as on move 60.

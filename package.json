@@ -22,7 +22,8 @@
     "typecheck": "npm run typecheck --workspace core && npm run typecheck --workspace server && npm run typecheck --workspace web",
     "export": "npm run export --workspace server",
     "fonts": "node scripts/fetch-fonts.mjs",
-    "engine": "node scripts/fetch-engine.mjs"
+    "engine": "node scripts/fetch-engine.mjs",
+    "reclassify": "npm run reclassify --workspace server --"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

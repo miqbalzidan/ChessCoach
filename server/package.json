@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "node --import tsx --test test/*.test.ts",
     "seed": "tsx src/seed.ts",
-    "export": "tsx src/export.ts"
+    "export": "tsx src/export.ts",
+    "reclassify": "tsx src/reclassify.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",
