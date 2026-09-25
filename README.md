@@ -19,6 +19,11 @@ class, with a plain-language coaching layer on top.
 - Per-move classification: brilliant · best · excellent · good · inaccuracy · mistake · blunder
 - Per-game accuracy for both sides
 - Board replay with an eval bar, the move played and the move the engine wanted
+- **The game at a glance** — the whole game as one line above the board, the two
+  territories filled in the pieces' own colours. Your own blunders, mistakes,
+  inaccuracies and brilliancies sit on it as dots, sized by severity; click anywhere
+  on it to put the board there. It is drawn from your side whichever colour you had,
+  the same way round as the board and the eval bar, so a cliff is always your own fall
 - Both players' names, ratings and accuracy either side of the board
 - Pieces slide, and moves, captures and checks each sound different — synthesised in
   the browser, so no audio files and nothing to download

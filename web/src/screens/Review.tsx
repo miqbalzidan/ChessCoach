@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { inSnapshotMode } from '../snapshot';
 import { Board } from '../components/Board';
+import { EvalGraph } from '../components/EvalGraph';
 import { ErrorNote, Loading } from '../components/Chrome';
 import {
   formatClock,
@@ -15,6 +16,7 @@ import {
 import { playMoveSound, setSoundEnabled, soundEnabled } from '../sound';
 import { analysisBoardUrl, chesscomAnalysisUrl, lessonFor, motifsOf } from '../links';
 import { GLYPH, VERDICT, type Classification, type Game, type Move } from '../types';
+import { winPercent } from '../../../core/src/evaluation.js';
 import { Verdict } from '../components/Verdict';
 
 type Filter = 'all' | '??' | '?' | '?!' | '!!';
@@ -275,6 +277,11 @@ export function Review() {
         </div>
       </div>
 
+      {/* The shape of the game, before the game itself. The move list answers
+          "which move" and the sheet answers "how bad"; this answers the question you
+          actually arrive with — when did it turn — and clicking takes you there. */}
+      <EvalGraph moves={moves} playerColor={playerColor} ply={ply} onSelect={setPly} />
+
       {/* A square is the one fixed shape here, so the grid is eval strip + fluid
           board + sheet — an asymmetry the content dictates. */}
       <div className="review-grid">
@@ -517,9 +524,9 @@ function PlayerStrip({
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 function evalToShare(cp: number): number {
-  // Same logistic the server uses, so the strip and the numbers agree.
-  const clamped = Math.max(-1000, Math.min(1000, cp));
-  return 100 - (50 + 50 * (2 / (1 + Math.exp(-0.00368208 * clamped)) - 1));
+  // The analysis' own logistic rather than a copy of it, so the strip, the advantage
+  // graph and every accuracy figure on the page are reading off one curve.
+  return 100 - winPercent(cp);
 }
 
 function labelFor(filter: Filter): string {
