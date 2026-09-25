@@ -598,10 +598,26 @@ a {
   text-overflow: ellipsis;
 }
 
+/* "Inaccuracy" is the longest of the five verdicts and the only one that runs out of
+   room. A fifth of a 320px phone is 5px short of it, so the tightening is scoped to
+   screens that narrow rather than thinned across every phone to rescue the rarest. */
+@media (max-width: 350px) {
+  .filter-name {
+    font-size: 9px;
+    letter-spacing: 0.01em;
+  }
+}
+
 .filter-glyph {
   font: 600 12px/1 var(--display);
-  margin-left: 4px;
   opacity: 0.8;
+}
+
+/* Glyph and count on one line, so the verdict above them gets the full tab width. */
+.filter-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
 }
 
 .pattern-head {
@@ -1062,6 +1078,132 @@ a {
   background: var(--vermilion);
 }
 
+/* ---------- the advantage graph ----------
+   The eval strip, unrolled over the length of the game: the same logistic, the same
+   direction (the line rises as the player gains), with a dot wherever one of the
+   player's own moves moved it. The two territories are the pieces' own colours, so
+   it reads as White against Black without a key to learn. */
+
+.evalgraph {
+  padding: 15px var(--margin) 17px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.evalgraph-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.evalgraph-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 400 11px/1 var(--ui);
+  letter-spacing: 0.04em;
+  color: var(--muted-3);
+}
+
+.evalgraph-legend-rule {
+  width: 1px;
+  height: 10px;
+  background: var(--rule-faint);
+  margin: 0 2px;
+}
+
+.evalgraph-plot {
+  position: relative;
+  height: 104px;
+  border: 1px solid var(--rule);
+}
+
+.evalgraph-plot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Whichever side the player had, their share fills up from the floor — so the
+   background is always the opponent's colour and the area is always the player's. */
+.evalgraph-plot.is-you-white {
+  background: var(--ink);
+}
+
+.evalgraph-plot.is-you-white .evalgraph-area {
+  fill: var(--piece-white);
+}
+
+.evalgraph-plot.is-you-black {
+  background: var(--piece-white);
+}
+
+.evalgraph-plot.is-you-black .evalgraph-area {
+  fill: var(--ink);
+}
+
+/* Both of these cross from ink into bone, so they are a mid tone that holds against
+   either rather than a token from one end of the palette. */
+.evalgraph-level {
+  stroke: rgba(150, 141, 118, 0.85);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.evalgraph-line {
+  fill: none;
+  stroke: rgba(150, 141, 118, 0.9);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.evalgraph-marks,
+.evalgraph-hits {
+  position: absolute;
+  inset: 0;
+}
+
+.evalgraph-marks {
+  pointer-events: none;
+}
+
+.evalgraph-mark {
+  position: absolute;
+  border-radius: 50%;
+  /* The colour arrives from the glyph class, the same one the move list uses. */
+  background: currentColor;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 1.5px var(--paper),
+    0 0 0 2.5px rgba(20, 19, 15, 0.35);
+}
+
+.evalgraph-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--mark);
+  transform: translateX(-50%);
+}
+
+.evalgraph-hits {
+  display: flex;
+}
+
+.evalgraph-hit {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.evalgraph-hit:hover {
+  background: rgba(63, 125, 140, 0.18);
+}
+
 /* ---------- review layout ---------- */
 
 .review-grid {
@@ -1094,7 +1236,7 @@ a {
   min-width: 0;
   border: 0;
   border-left: 1px solid var(--rule);
-  padding: 10px 4px;
+  padding: 10px 3px;
   font: 600 11px/1 var(--ui);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1527,6 +1669,12 @@ a {
 
   .review-actions {
     flex-wrap: wrap;
+  }
+
+  /* Shorter on a phone, where the board has already taken the fold. The shape is
+     still readable at this height; a cliff is a cliff. */
+  .evalgraph-plot {
+    height: 84px;
   }
 
   /* The two readings stack, and the divider becomes the rule above the second. */

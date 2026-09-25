@@ -12,7 +12,7 @@ import {
 } from './evaluation.js';
 import { applyUci, detectMotifs, safeChess } from './motifs.js';
 import { PIECE_VALUE } from './evaluation.js';
-import type { AnalysedMove, Color, GameAnalysis } from './types.js';
+import type { AnalysedMove, Classification, Color, GameAnalysis } from './types.js';
 
 export interface ParsedMove {
   ply: number;
@@ -137,14 +137,13 @@ export async function analyseGame(
     const bestUci = before.pv[0] ?? null;
     const forced = countLegalMoves(move.fenBefore) === 1;
 
-    const classification = classifyMove({
-      winPercentBefore: wpBefore,
-      winPercentAfter: wpAfter,
-      playedUci: move.uci,
+    const classification = classifyStoredMove({
+      fenBefore: move.fenBefore,
+      fenAfter: move.fenAfter,
+      uci: move.uci,
+      evalBefore,
+      evalAfter,
       bestUci,
-      forced,
-      sacrifice: isSacrifice(move.fenBefore, move.fenAfter, move.uci),
-      cpAfter: evalAfter,
     });
 
     // Only genuine mistakes get a motive. A best move that happens to sit in a
@@ -226,31 +225,105 @@ function countLegalMoves(fen: string): number {
   return position ? position.moves().length : 0;
 }
 
-/** True when the move leaves material the opponent can simply take. */
+/**
+ * What the classifier needs about one move — and nothing the engine has to be run
+ * again to learn.
+ *
+ * Every field here is a column the database already holds, which makes the verdict a
+ * pure function of stored analysis rather than a by-product of the search that
+ * produced it. That is what lets a change to the rules reach games analysed months
+ * ago in a second, instead of an afternoon of re-running Stockfish over them.
+ *
+ * `analyseGame` calls this too, so the live path and the rewrite path cannot drift.
+ */
+export interface MoveFacts {
+  fenBefore: string;
+  fenAfter: string;
+  uci: string;
+  /** Centipawns from the mover's point of view, exactly as stored. */
+  evalBefore: number;
+  evalAfter: number;
+  bestUci: string | null;
+}
+
+export function classifyStoredMove(facts: MoveFacts): Classification {
+  return classifyMove({
+    winPercentBefore: winPercent(facts.evalBefore),
+    winPercentAfter: winPercent(facts.evalAfter),
+    playedUci: facts.uci,
+    bestUci: facts.bestUci,
+    forced: countLegalMoves(facts.fenBefore) === 1,
+    sacrifice: isSacrifice(facts.fenBefore, facts.fenAfter, facts.uci),
+    cpAfter: facts.evalAfter,
+  });
+}
+
+/**
+ * Static exchange evaluation: what the side to move nets by starting a capture
+ * sequence on one square, in pawns, assuming both sides always take with their
+ * cheapest piece and stop as soon as taking stops paying.
+ *
+ * Reading it off `moves()` rather than `attackers()` is the point. `attackers()` is
+ * pseudo-legal — it counts pinned pieces, and it counts a king standing beside a
+ * defended square, which cannot capture into check. Legal moves answer the question
+ * that was actually being asked, and pins and illegal king captures fall out for
+ * free rather than needing cases of their own.
+ *
+ * Promotions during an exchange are valued as the pawn they start as, which
+ * understates a rare tactic in the direction of calling fewer moves sacrifices.
+ */
+function exchangeValue(board: Chess, square: string): number {
+  const takes = board
+    .moves({ verbose: true })
+    .filter((move) => move.to === square && move.captured);
+  if (takes.length === 0) return 0;
+
+  let cheapest = takes[0]!;
+  for (const take of takes) {
+    if ((PIECE_VALUE[take.piece] ?? 0) < (PIECE_VALUE[cheapest.piece] ?? 0)) cheapest = take;
+  }
+
+  const gain = PIECE_VALUE[cheapest.captured ?? 'p'] ?? 0;
+  board.move({ from: cheapest.from, to: cheapest.to, promotion: cheapest.promotion });
+  const reply = exchangeValue(board, square);
+  board.undo();
+
+  // Standing pat is always allowed: nobody is obliged to continue a losing trade.
+  return Math.max(0, gain - reply);
+}
+
+/**
+ * True when the move leaves material the opponent can profitably take.
+ *
+ * This used to be a two-ply guess — the piece's own value, less what it captured,
+ * less one recapture — driven by `attackers()`. It was wrong at both ends.
+ *
+ * It called moves sacrifices that risked nothing. `PIECE_VALUE.k` is 0, so an enemy
+ * king beside the square came out as the cheapest attacker and set the recapture
+ * value to zero, even when the king was forbidden to enter. Five of the nine moves
+ * labelled brilliant in the development database were that shape: three of them a
+ * bishop giving check from a square the king could not take on, evaluation unmoved
+ * at 0.00 either side of the "sacrifice".
+ *
+ * And, reading only one recapture deep, it could not see a real sacrifice through to
+ * the end of the exchange. Morphy's 13. Rxd7 in the Opera Game is two pawns down
+ * once the swap finishes, and four ply are needed to find that out.
+ *
+ * A full exchange evaluation answers both, so the rule is now simply: after the move,
+ * does the opponent come out at least two pawns ahead by taking?
+ */
 function isSacrifice(fenBefore: string, fenAfter: string, uci: string): boolean {
-  const before = safeChess(fenBefore);
   const after = safeChess(fenAfter);
-  if (!before || !after) return false;
+  if (!after) return false;
 
   const probe = safeChess(fenBefore);
   if (!probe) return false;
   const played = applyUci(probe, uci);
+  // A king cannot be given up, so it cannot be sacrificed.
   if (!played || played.piece === 'k') return false;
 
-  const mover = played.color;
-  const opponent = mover === 'w' ? 'b' : 'w';
   const captured = played.captured ? (PIECE_VALUE[played.captured] ?? 0) : 0;
-  const risked = PIECE_VALUE[played.piece] ?? 0;
-
-  const attackers = after.attackers(played.to, opponent);
-  if (attackers.length === 0) return false;
-  const cheapestAttacker = Math.min(
-    ...attackers.map((square) => PIECE_VALUE[after.get(square)?.type ?? 'p'] ?? 1),
-  );
-  const defenders = after.attackers(played.to, mover).length;
-  const recovered = defenders > 0 ? cheapestAttacker : 0;
-
-  return risked - captured - recovered >= 2;
+  return exchangeValue(after, played.to) - captured >= 2;
 }
 
 function uciToSan(fen: string, uci: string): string | null {

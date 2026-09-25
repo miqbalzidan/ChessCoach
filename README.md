@@ -19,11 +19,21 @@ class, with a plain-language coaching layer on top.
 - Per-move classification: brilliant · best · excellent · good · inaccuracy · mistake · blunder
 - Per-game accuracy for both sides
 - Board replay with an eval bar, the move played and the move the engine wanted
+- **The game at a glance** — the whole game as one line above the board, the two
+  territories filled in the pieces' own colours. Your own blunders, mistakes,
+  inaccuracies and brilliancies sit on it as dots, sized by severity; click anywhere
+  on it to put the board there. It is drawn from your side whichever colour you had,
+  the same way round as the board and the eval bar, so a cliff is always your own fall
 - Both players' names, ratings and accuracy either side of the board
 - Pieces slide, and moves, captures and checks each sound different — synthesised in
   the browser, so no audio files and nothing to download
 - Right-click a square to highlight it, right-drag for an arrow, left-click to clear
-- A link straight to the game's analysis board on Chess.com when it came from there
+- **analyse** — the position on the board, opened on a free analysis board with an
+  engine. This one goes to Lichess, for a reason worth knowing: on a phone the
+  Chess.com app claims chess.com links and routes them to Game Review no matter what
+  the URL asks for, so a Chess.com link cannot reliably open a board there.
+- **chess.com** — the game itself, when it came from there. On a phone this opens the
+  Chess.com app, which decides for itself which screen you land on.
 
 **V2 — cross-game statistics**
 
@@ -246,8 +256,31 @@ are converted to a win probability with the standard logistic curve first, and t
 **Forced moves are never mistakes.** If there was one legal move, it is not a blunder no
 matter what it cost.
 
-**Brilliant means a sacrifice the engine would play** — material given up, still the top
-engine move, in a position that is not already won.
+**Brilliant means a sacrifice the engine would play** — material the opponent could
+profitably take, still the top engine move, in a position that is not already won.
+
+"Could take" is settled by a full exchange evaluation on the square, read off the
+opponent's *legal* moves. That matters more than it sounds. The obvious shortcut —
+ask which pieces attack the square — counts pinned pieces and, far more often, an enemy
+king standing beside a square its own side defends, which cannot capture into check. A
+bishop giving check from a square the king may not enter is perfectly safe, and used to
+read as a piece thrown away. Swapping the square off to the end also catches the
+opposite error: Morphy's 13. Rxd7 in the Opera Game only shows its cost four ply in, so
+a rule that looks one recapture deep cannot see the most famous sacrifice in chess.
+
+**Verdicts can be recomputed without the engine.** Every input to a verdict — both
+evaluations, the move played, the engine's choice, the positions either side — is
+already a column in the database, so a change to these rules does not mean re-analysing
+the archive:
+
+```
+npm run reclassify              # say what would change
+npm run reclassify -- --write   # change it
+```
+
+Reporting is the default because this rewrites a column you cannot regenerate without
+running Stockfish over every game again. It only ever touches the verdict; accuracy
+comes from win-percentage loss and does not move.
 
 **Phase is read off the board**, not the move number: a queenless four-piece position is
 an endgame on move 18 as much as on move 60.

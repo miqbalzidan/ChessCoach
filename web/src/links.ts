@@ -16,17 +16,51 @@
  * /analysis/game/live/123. Anything that is not one of those shapes — another site,
  * a PGN someone pasted — gets no link rather than a guessed one.
  *
- * `tab=analysis`, deliberately. The other tab is Game Review, which is Chess.com's
- * own coached walkthrough: it starts an animation, it costs a membership to finish,
- * and it is a second opinion nobody asked for. The point of following this link is
- * to put the position on a board and push the pieces around — this sheet has
- * already said what went wrong.
+ * `tab=analysis` asks for the board rather than Game Review, and on a desktop browser
+ * that is what you get. ON A PHONE IT IS IGNORED, and the reason is worth writing down
+ * because it looks like a bug in this app and is not fixable from this app:
+ *
+ *   Chess.com's mobile app registers chess.com as an Android App Link / iOS Universal
+ *   Link. Tapping this URL hands it straight to the installed app — the browser never
+ *   runs, so the page that would read `tab` never loads. The app then routes by path
+ *   alone, and /analysis/game/<type>/<id> is its Game Review screen. No query string
+ *   can change that, because nothing on our side is doing the routing any more.
+ *
+ * So this link is now labelled for what it actually does — open the game in Chess.com —
+ * and `analysisBoardUrl` below is the one that reliably opens a board.
  */
 export function chesscomAnalysisUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   const match = /^https?:\/\/(?:www\.)?chess\.com\/game\/(live|daily)\/(\d+)/i.exec(url);
   if (!match) return null;
   return `https://www.chess.com/analysis/game/${match[1]}/${match[2]}?tab=analysis`;
+}
+
+/** A FEN we are willing to put in a URL: the four fields that define a position. */
+const FEN_SHAPE =
+  /^[1-8pnbrqkPNBRQK]+(?:\/[1-8pnbrqkPNBRQK]+){7} [wb] (?:[KQkq]{1,4}|-) (?:[a-h][36]|-)(?: \d+ \d+)?$/;
+
+/**
+ * A board you can actually push pieces around on, opened at this exact position.
+ *
+ * Lichess takes the FEN in the path with underscores for spaces, which is the one
+ * position-in-a-URL scheme that is documented and stable. Chess.com has no reliable
+ * equivalent — `chess.com/analysis?fen=` is a long-standing forum request rather than
+ * a supported feature — and, more to the point, a chess.com URL on a phone is caught
+ * by the app before anything can read a parameter. Lichess is not a URL that app
+ * claims, so this link goes where it says it goes.
+ *
+ * Free, no account, engine on the page. The position travels; nothing about the player
+ * does.
+ */
+export function analysisBoardUrl(
+  fen: string | null | undefined,
+  orientation: 'white' | 'black' = 'white',
+): string | null {
+  if (!fen) return null;
+  const trimmed = fen.trim();
+  if (!FEN_SHAPE.test(trimmed)) return null;
+  return `https://lichess.org/analysis/standard/${trimmed.replace(/ /g, '_')}?color=${orientation}`;
 }
 
 export interface Lesson {
