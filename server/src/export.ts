@@ -38,10 +38,12 @@ export function inlineIntoHtml(
     (_match, href: string) => `<style>${readAsset(distDir, href)}</style>`,
   );
 
-  // The bundle moves out of <head> and down to the end of <body>. Vite ships it as a
-  // deferred module; inlined, it becomes a classic script, and a classic script in the
-  // head runs before #root exists. It also has to come after the boot script, since it
-  // reads the snapshot on its first tick.
+  // The bundle moves out of <head> and down to the end of <body>, after the boot
+  // script, which it reads on its first tick. It stays a module when inlined: the
+  // bundle is ES module code, and since the phone's own worker arrived it carries
+  // `import.meta.url` (for `new Worker(new URL(...))`), which is a syntax error in a
+  // classic script — the whole file then rendered blank. An inline module also runs
+  // only once the document is parsed, so the ordering holds either way.
   let bundle = '';
   html = html.replace(
     /<script[^>]*src="\/(assets\/[^"]+\.js)"[^>]*><\/script>\s*/g,
@@ -72,7 +74,7 @@ export function inlineIntoHtml(
     );
 
   const tail = `${snapshotScripts(snapshot, options.plainFallback === true)}
-<script>${bundle}</script>`;
+<script type="module">${bundle}</script>`;
   // A function replacer, not a string: minified JS is full of `$&` and `$\`` sequences,
   // and a string replacement would treat them as substitution patterns and corrupt the
   // bundle into something that no longer parses.

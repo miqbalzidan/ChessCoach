@@ -109,8 +109,15 @@ testing and is kept, so opening the game again costs nothing. If Claude cannot b
 reached — not installed, not signed in, usage used up for now — the page says which,
 and the engine's analysis stands on its own.
 
-Readings travel in exports. Ask on the computer, export, and the phone shows them; the
-phone itself cannot ask, because Claude Code runs on a computer.
+**On a phone** it works two ways, both checked in a phone-sized browser:
+
+- **On the same Wi-Fi as the computer** (see *Reading it on the same network* below),
+  the phone is using the computer's server, so "ask Claude" is there and works — Claude
+  runs on the computer and the reading appears on the phone.
+- **On its own** — an exported `.html`, or the installed app seeded from an export —
+  it shows every reading the computer made, with the turning points and notes, but
+  cannot ask for new ones: there is no Claude Code on a phone. Ask on the computer,
+  export again, and the new readings come with the file.
 
 ---
 
