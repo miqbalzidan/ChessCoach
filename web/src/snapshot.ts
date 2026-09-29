@@ -228,6 +228,7 @@ export function serveFromSnapshot<T>(path: string, init?: RequestInit): T {
     const id = Number(segments[1]);
     const game = snapshot.games.find((candidate) => candidate.id === id);
     if (!game) throw new SnapshotError('No such game', 404);
+    if (segments[2] === 'review') return { review: snapshot.reviews?.[String(id)] ?? null } as T;
     return { game, moves: snapshot.moves[String(id)] ?? [] } as T;
   }
 

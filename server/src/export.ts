@@ -13,6 +13,8 @@ import type { Snapshot } from '../../web/src/types.js';
 import { buildSnapshot } from '../../web/src/snapshot-build.js';
 import { getDb, type DB } from './db-node.js';
 import { generateCoaching } from './coach-claude.js';
+import { ClaudeUnavailable } from './claude-code.js';
+import { offlineCoaching } from '../../core/src/coach.js';
 
 /**
  * Wraps the built web app around a snapshot to make one file that needs nothing:
@@ -36,10 +38,12 @@ export function inlineIntoHtml(
     (_match, href: string) => `<style>${readAsset(distDir, href)}</style>`,
   );
 
-  // The bundle moves out of <head> and down to the end of <body>. Vite ships it as a
-  // deferred module; inlined, it becomes a classic script, and a classic script in the
-  // head runs before #root exists. It also has to come after the boot script, since it
-  // reads the snapshot on its first tick.
+  // The bundle moves out of <head> and down to the end of <body>, after the boot
+  // script, which it reads on its first tick. It stays a module when inlined: the
+  // bundle is ES module code, and since the phone's own worker arrived it carries
+  // `import.meta.url` (for `new Worker(new URL(...))`), which is a syntax error in a
+  // classic script — the whole file then rendered blank. An inline module also runs
+  // only once the document is parsed, so the ordering holds either way.
   let bundle = '';
   html = html.replace(
     /<script[^>]*src="\/(assets\/[^"]+\.js)"[^>]*><\/script>\s*/g,
@@ -70,7 +74,7 @@ export function inlineIntoHtml(
     );
 
   const tail = `${snapshotScripts(snapshot, options.plainFallback === true)}
-<script>${bundle}</script>`;
+<script type="module">${bundle}</script>`;
   // A function replacer, not a string: minified JS is full of `$&` and `$\`` sequences,
   // and a string replacement would treat them as substitution patterns and corrupt the
   // bundle into something that no longer parses.
@@ -182,9 +186,18 @@ async function main(): Promise<void> {
 
   console.log(`Exporting ${name}…`);
   const snapshot = await buildSnapshot(db, name, {
-    // Asking Claude is the server's to offer and stays opt-in: an export should not
-    // quietly spend money, and the offline summariser is already good.
-    generateCoaching: withCoaching ? generateCoaching : undefined,
+    // Asking Claude stays opt-in: it runs once for every lens without a summary yet,
+    // which is dozens of calls against your plan's allowance, and the offline
+    // summariser is already good. A lens Claude cannot answer for — usage used up
+    // halfway through, say — gets the offline summary rather than sinking the export.
+    generateCoaching: withCoaching
+      ? (input) =>
+          generateCoaching(input).catch((error: unknown) => {
+            if (!(error instanceof ClaudeUnavailable)) throw error;
+            console.log(`  ${error.message} — writing that lens offline`);
+            return offlineCoaching(input);
+          })
+      : undefined,
     defaultDepth: process.env.ANALYSIS_DEPTH ?? '16',
     onProgress: (message) => console.log(`  ${message}`),
   });

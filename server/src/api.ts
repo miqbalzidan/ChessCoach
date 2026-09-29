@@ -26,23 +26,49 @@ import { dashboard, openings } from '../../core/src/stats.js';
 import { parseEco, parseLens, parseScope } from '../../core/src/lens.js';
 import { detectPatterns } from '../../core/src/patterns.js';
 import { profile } from '../../core/src/profile.js';
-import { readCachedCoaching, writeCachedCoaching } from '../../core/src/coach.js';
-import { generateCoaching, hasApiKey } from './coach-claude.js';
+import { offlineCoaching, readCachedCoaching, writeCachedCoaching } from '../../core/src/coach.js';
+import { readGameReview, writeGameReview } from '../../core/src/game-review.js';
+import { generateCoaching, generateGameReview } from './coach-claude.js';
+import { claudeStatus, ClaudeUnavailable, peekClaudeStatus } from './claude-code.js';
 import { MOTIF_LABELS } from '../../core/src/motifs.js';
 import { TIME_CLASSES, type GameResult, type TimeClass } from '../../core/src/types.js';
 
 export function createApi(db: DB, pool: EnginePool): Router {
   const router = Router();
+  // Asked once up front, so the first page load has an answer waiting.
+  void claudeStatus();
 
+  // Every page load starts here, so nothing in it waits on Claude Code.
   router.get('/health', (_req, res) => {
     res.json({
       ok: true,
       engine: pool.engineName,
       engines: pool.size,
-      coaching: hasApiKey() ? 'claude' : 'offline',
+      coaching: peekClaudeStatus()?.available ? 'claude' : 'offline',
       defaultDepth: analysisDepth(db),
     });
   });
+
+  /**
+   * One Claude run per thing at a time. A second click while the first is thinking
+   * joins it instead of starting another, since each run spends the plan's allowance
+   * and both would write the same row.
+   */
+  const inFlight = new Map<string, Promise<unknown>>();
+  function once<T>(key: string, work: () => Promise<T>): Promise<T> {
+    const running = inFlight.get(key) as Promise<T> | undefined;
+    if (running) return running;
+    const started = work().finally(() => inFlight.delete(key));
+    inFlight.set(key, started);
+    return started;
+  }
+
+  function claudeFailure(res: Response, error: unknown): void {
+    // 503 rather than 500: nothing is broken here, Claude just could not be reached,
+    // and the message says what would let it be.
+    if (error instanceof ClaudeUnavailable) res.status(503).json({ error: error.message });
+    else res.status(500).json({ error: messageOf(error) });
+  }
 
   router.get('/players', (_req, res) => {
     res.json({ players: listPlayers(db) });
@@ -164,6 +190,34 @@ export function createApi(db: DB, pool: EnginePool): Router {
     res.json({ game, moves: getMoves(db, game.id) });
   });
 
+  router.get('/games/:id/review', (req, res) => {
+    const game = getGame(db, Number(req.params.id));
+    if (!game) return res.status(404).json({ error: 'No such game' });
+    res.json({ review: readGameReview(db, game) });
+  });
+
+  /** Claude reads this game. Only ever on request — each one draws on the plan. */
+  router.post('/games/:id/review', async (req, res) => {
+    const game = getGame(db, Number(req.params.id));
+    if (!game) return res.status(404).json({ error: 'No such game' });
+    if (!game.analysed_at) {
+      return res.status(409).json({ error: 'Analyse the game first — Claude reads the engine’s analysis.' });
+    }
+
+    try {
+      const review = await once(`game:${game.id}`, async () => {
+        const moves = getMoves(db, game.id);
+        const patterns = detectPatterns(db, game.player_id, { scope: 'all' });
+        const written = await generateGameReview(game, moves, patterns);
+        writeGameReview(db, game, written);
+        return readGameReview(db, game);
+      });
+      res.json({ review });
+    } catch (error) {
+      claudeFailure(res, error);
+    }
+  });
+
   router.post('/games/:id/analyse', async (req, res) => {
     const game = getGame(db, Number(req.params.id));
     if (!game) return res.status(404).json({ error: 'No such game' });
@@ -214,7 +268,13 @@ export function createApi(db: DB, pool: EnginePool): Router {
     });
   });
 
-  router.get('/players/:username/coaching', async (req, res) => {
+  /**
+   * Reading the summary never asks Claude. Every opening and time class is a lens of
+   * its own, and clicking through a dozen of them should not quietly spend a dozen
+   * runs of your plan — so a lens without a summary gets the offline one, and Claude
+   * writes only when asked, below.
+   */
+  router.get('/players/:username/coaching', (req, res) => {
     const player = findPlayer(db, req.params.username);
     if (!player) return res.status(404).json({ error: 'No such player' });
 
@@ -224,26 +284,47 @@ export function createApi(db: DB, pool: EnginePool): Router {
       if (cached) return res.json({ scope: lens.scope, lens, coaching: cached, cached: true });
     }
 
+    const coaching = offlineCoaching({
+      username: player.username,
+      lens,
+      stats: dashboard(db, player.id, lens),
+      patterns: detectPatterns(db, player.id, lens),
+    });
+    writeCachedCoaching(db, player.id, lens, coaching);
+    res.json({ scope: lens.scope, lens, coaching, cached: false });
+  });
+
+  /** Claude writes this lens's summary, replacing whatever was there. */
+  router.post('/players/:username/coaching', async (req, res) => {
+    const player = findPlayer(db, req.params.username);
+    if (!player) return res.status(404).json({ error: 'No such player' });
+
+    const lens = parseLens(req.query);
     try {
-      const coaching = await generateCoaching({
-        username: player.username,
-        lens,
-        stats: dashboard(db, player.id, lens),
-        patterns: detectPatterns(db, player.id, lens),
+      const coaching = await once(`coaching:${player.id}:${JSON.stringify(lens)}`, async () => {
+        const written = await generateCoaching({
+          username: player.username,
+          lens,
+          stats: dashboard(db, player.id, lens),
+          patterns: detectPatterns(db, player.id, lens),
+        });
+        writeCachedCoaching(db, player.id, lens, written);
+        return written;
       });
-      writeCachedCoaching(db, player.id, lens, coaching);
       res.json({ scope: lens.scope, lens, coaching, cached: false });
     } catch (error) {
-      res.status(500).json({ error: messageOf(error) });
+      claudeFailure(res, error);
     }
   });
 
-  router.get('/settings', (_req, res) => {
+  router.get('/settings', async (_req, res) => {
+    const claude = await claudeStatus();
     res.json({
       analysisDepth: analysisDepth(db),
       engine: pool.engineName,
       engines: pool.size,
-      coaching: hasApiKey() ? 'claude' : 'offline',
+      coaching: claude.available ? 'claude' : 'offline',
+      coachingNote: claude.reason,
       players: listPlayers(db),
     });
   });

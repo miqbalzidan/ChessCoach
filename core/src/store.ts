@@ -331,6 +331,11 @@ export function listGames(db: DB, playerId: number, filter: GameFilter = {}): {
 }
 
 export function deletePlayerData(db: DB, playerId: number): void {
+  // Explicit rather than left to ON DELETE CASCADE, which only fires on a connection
+  // that turned foreign keys on.
+  db.prepare(
+    'DELETE FROM game_reviews WHERE game_id IN (SELECT id FROM games WHERE player_id = ?)',
+  ).run(playerId);
   db.prepare('DELETE FROM games WHERE player_id = ?').run(playerId);
   db.prepare('DELETE FROM coaching WHERE player_id = ?').run(playerId);
 }

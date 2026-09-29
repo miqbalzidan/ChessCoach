@@ -56,9 +56,68 @@ class, with a plain-language coaching layer on top.
 - Clock-pressure correlation from the `[%clk]` data in live games
 - A Claude-written summary of the recurring weaknesses, with a suggested follow-up
   attached to each pattern
+- **Claude reads each game after Stockfish does** — see below
 - A link out to a lesson for whichever motif you keep repeating
 - A scouting report: what holds up and what an opponent would aim at, measured
   against the players you actually face rather than an absolute bar
+
+---
+
+## Claude, on your Claude plan
+
+Stockfish says what every move was worth. It does not say which of a dozen imperfect
+moves actually lost the game, what you were probably thinking, or what the better move
+was *for*. That is Claude's part, and it reads the engine's work rather than redoing it:
+
+- **On a game — "ask Claude about this game".** Claude gets every move with the engine's
+  evaluation from your side, your costly moves in full (the position, the engine's move
+  and line, what the opponent actually replied and the engine's line from there, the
+  motif, your clock), the opponent's errors paired with how you answered them, and your
+  recurring patterns across all your games. It answers with a short account of the
+  game, the two to four moments that decided it, one habit to take into the next game,
+  and — when it applies — which of your recurring leaks this game repeated. Each
+  turning point is a button onto the board, and Claude's note on that move appears
+  beside the board when you land on it.
+- **On the sheet — "ask Claude" under the summary.** Claude rewrites the coaching
+  summary for the lens on screen: the headline, how the patterns connect, a drill per
+  pattern and a study plan.
+
+Every evaluation, verdict and engine line is handed to Claude as fact it must not
+contradict. The engine is right about the numbers and has nothing to say about people;
+Claude is good at people and is not trusted to count.
+
+**It runs through Claude Code on your computer, on your Pro or Max plan** — the same
+allowance chatting on claude.ai uses. No API key, no Console account, no second bill.
+The server runs `claude -p` as a subprocess with no tools, no settings or MCP servers
+and a scratch working directory, and it leaves any `ANTHROPIC_API_KEY` in your
+environment out of the call, so it can only ever draw on the plan.
+
+To switch it on, install [Claude Code](https://claude.com/code) and sign in once:
+
+```bash
+claude            # sign in with your Claude account, then exit
+npm run dev       # Settings now says: coaching layer — Claude, via Claude Code
+```
+
+(On Windows use the native installer; if `claude` is not on the server's PATH, set
+`CLAUDE_PATH`.)
+
+Claude only writes when you ask. Every opening and time class is a lens of its own, and
+browsing them should not quietly spend a run of your plan on each, so until you ask the
+offline summariser writes from the same numbers. A game reading took 10–16 seconds in
+testing and is kept, so opening the game again costs nothing. If Claude cannot be
+reached — not installed, not signed in, usage used up for now — the page says which,
+and the engine's analysis stands on its own.
+
+**On a phone** it works two ways, both checked in a phone-sized browser:
+
+- **On the same Wi-Fi as the computer** (see *Reading it on the same network* below),
+  the phone is using the computer's server, so "ask Claude" is there and works — Claude
+  runs on the computer and the reading appears on the phone.
+- **On its own** — an exported `.html`, or the installed app seeded from an export —
+  it shows every reading the computer made, with the turning points and notes, but
+  cannot ask for new ones: there is no Claude Code on a phone. Ask on the computer,
+  export again, and the new readings come with the file.
 
 ---
 
@@ -106,7 +165,7 @@ Settings says how many openings a file carries. That costs about 7% more — the
 the bulk of a snapshot and they are shared.
 
 Two flags, both rarely needed: `--coaching` asks Claude for any lens that has not got
-coaching cached yet, and `--with-fallback` adds an uncompressed copy of the payload for
+coaching cached yet — once per lens, which is dozens of runs against your plan — and `--with-fallback` adds an uncompressed copy of the payload for
 browsers without `DecompressionStream`, which roughly quadruples the file.
 
 ### No computer at all — run the whole thing on the phone
@@ -226,16 +285,19 @@ Everything is optional; the defaults work.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | — | Switches the coaching layer from the offline summariser to Claude |
-| `COACH_MODEL` | `claude-opus-5` | Model used for the coaching summaries |
+| `CLAUDE_PATH` | `claude` | The Claude Code executable, when it is not on the PATH |
+| `COACH_MODEL` | Claude Code's default | Any name `claude --model` accepts, for game readings and summaries |
+| `COACH_EFFORT` | `high` | How hard Claude thinks before writing (`low` … `max`, or empty for Claude Code's default) |
+| `COACH_TIMEOUT_MS` | `300000` | How long one Claude run may take before it is stopped |
 | `ANALYSIS_DEPTH` | `16` | Default Stockfish depth (also settable in the UI) |
 | `STOCKFISH_PATH` | auto-detected | Path to the engine binary |
 | `ENGINE_POOL_SIZE` | cores − 1, max 6 | How many engine processes run in parallel |
 | `DATABASE_PATH` | `data/chesscoach.db` | SQLite file |
 | `PORT` | `8787` | API port |
 
-Without an API key the app still works end to end — the coaching text is generated
-deterministically from the same numbers, in fewer words.
+Without Claude Code the app still works end to end — the coaching text is generated
+deterministically from the same numbers, in fewer words, and games simply have no
+reading.
 
 The three typefaces are self-hosted from `web/public/fonts` (latin subsets, 224 KB over
 nine files) rather than fetched from Google, because an exported snapshot has to render

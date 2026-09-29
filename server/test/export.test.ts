@@ -81,6 +81,15 @@ describe('snapshot inlining', () => {
     assert.ok(!/<script[^>]*src="\/assets/.test(html), 'left an unresolved asset reference');
   });
 
+  // Found by opening a real export on a phone-sized browser: the bundle creates the
+  // phone's worker with `new URL(..., import.meta.url)`, which will not even parse in
+  // a classic script, so every exported file rendered blank.
+  test('the bundle is inlined as a module, where import.meta parses', () => {
+    const bundle = 'const u=new URL("/assets/w.js",import.meta.url);';
+    const html = inlineIntoHtml(TEMPLATE, fixtureSnapshot(), fixtureDist(bundle));
+    assert.ok(html.includes(`<script type="module">${bundle}</script>`));
+  });
+
   test('nothing is left pointing at the network or the filesystem root', () => {
     const html = inlineIntoHtml(TEMPLATE, fixtureSnapshot(), fixtureDist('var x=1;'));
     assert.ok(!html.includes('href="/assets'), 'stylesheet still external');

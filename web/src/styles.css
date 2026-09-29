@@ -1204,6 +1204,157 @@ a {
   background: rgba(63, 125, 140, 0.18);
 }
 
+/* Under the summary on the dashboard: who wrote it, and the way to have Claude write
+   it instead. Quiet, because the summary is what matters, not its byline. */
+.coach-by {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 14px;
+  font: 400 11px/1.4 var(--ui);
+  color: rgba(232, 226, 212, 0.55);
+}
+
+.coach-error {
+  margin-top: 10px;
+  font: 400 12px/1.5 var(--ui);
+  color: var(--vermilion-pale);
+}
+
+/* ---------- claude's reading ----------
+   Why the game turned, under the line that shows where. Set in the serif like every
+   other piece of coaching, so the generated layer reads as something to read rather
+   than scan, and kept to one line until there is something to say. */
+
+.reading {
+  padding: 14px var(--margin) 18px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.reading-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.reading-by {
+  font: 400 11px/1.3 var(--ui);
+  color: var(--muted-3);
+}
+
+.reading-ask {
+  margin-left: auto;
+}
+
+.reading-note {
+  margin: 10px 0 0;
+  max-width: 70ch;
+  font: 400 13.5px/1.55 var(--prose);
+  color: var(--ink-3);
+}
+
+.reading-error {
+  margin-top: 10px;
+  max-width: 80ch;
+  font: 400 12.5px/1.5 var(--ui);
+  color: var(--vermilion-dark);
+}
+
+.reading-summary {
+  margin: 12px 0 0;
+  max-width: 72ch;
+  color: var(--ink);
+}
+
+/* Each turning point is a way onto the board, drawn as the same bordered chip at
+   rest and filled in ink when the board is on it — the move list's own idiom. */
+.reading-points {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reading-point {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reading-point:hover {
+  border-color: var(--ink);
+}
+
+.reading-point.is-current {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bone);
+}
+
+.reading-move {
+  font: 600 12px/1 var(--mono);
+}
+
+.reading-title {
+  font: 400 12.5px/1.3 var(--ui);
+}
+
+.reading-lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin: 14px 0 0;
+}
+
+.reading-lesson .coach-prose {
+  font-size: 15px;
+}
+
+.reading-recurring {
+  margin: 8px 0 0;
+  font: 400 12.5px/1.5 var(--ui);
+  color: var(--muted-3);
+}
+
+/* Beside the board, Claude's word takes the reading's own colour — the engine's
+   findings keep vermilion and green, so the two voices are never confused. */
+.reading-here-label {
+  color: #8fc0cb;
+  letter-spacing: 0.2em;
+}
+
+.reading-here {
+  padding: 20px 18px 22px;
+}
+
+.reading-here-board {
+  display: none;
+  margin-top: 18px;
+}
+
+@media (max-width: 900px) {
+  .reading-here-board {
+    display: block;
+  }
+
+  .reading-here-sheet {
+    display: none;
+  }
+}
+
 /* ---------- review layout ---------- */
 
 .review-grid {

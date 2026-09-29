@@ -147,7 +147,7 @@ export function Settings({
         <div className="headline-aside">
           {settings.engine} × {settings.engines} processes
           <br />
-          coaching layer: {settings.coaching === 'claude' ? 'Claude' : 'offline summariser'}
+          coaching layer: {settings.coaching === 'claude' ? 'Claude, via Claude Code' : 'offline summariser'}
         </div>
       </div>
 
@@ -270,9 +270,28 @@ export function Settings({
           <div className="label">coaching layer</div>
         </div>
         <div className="prose" style={{ marginTop: 12 }}>
-          {settings.coaching === 'claude'
-            ? 'Claude is writing the plain-language summaries. Set COACH_MODEL to change the model.'
-            : 'No ANTHROPIC_API_KEY is set, so summaries come from the offline summariser — the same numbers, fewer words. Set the key and restart the server to switch it on.'}
+          {settings.coaching === 'claude' ? (
+            <>
+              Claude reads Stockfish’s analysis through Claude Code on this computer, on
+              your Claude plan — no API key and no separate billing. It writes only when you
+              ask: “ask Claude about this game” on a game, “ask Claude” under the summary.
+              Until then, the offline summariser writes from the same numbers. Set
+              COACH_MODEL to pick a model your plan has.
+            </>
+          ) : settings.coaching === 'snapshot' ? (
+            'This is a snapshot: it carries whatever Claude wrote on the computer that made it, and cannot ask for more.'
+          ) : (
+            <>
+              Summaries come from the offline summariser — the same numbers, fewer words.
+              {settings.coachingNote ? (
+                <>
+                  {' '}Claude is not available: {settings.coachingNote}
+                </>
+              ) : (
+                ' Claude reads games through Claude Code, which runs on a computer; this copy of the app shows what Claude wrote there and was exported here.'
+              )}
+            </>
+          )}
         </div>
 
         <LocalDevice onSeeded={onChanged} />

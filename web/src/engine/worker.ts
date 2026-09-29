@@ -42,6 +42,7 @@ import {
   runPgnImport,
 } from '../../../core/src/importer.js';
 import { offlineCoaching, readCachedCoaching, writeCachedCoaching } from '../../../core/src/coach.js';
+import { readGameReview } from '../../../core/src/game-review.js';
 import { seedFromSnapshot, type SnapshotSeed } from '../../../core/src/seed-snapshot.js';
 import type { EnginePool } from '../../../core/src/engine.js';
 import { openBrowserDb } from './db-wasm.js';
@@ -55,6 +56,13 @@ import { TIME_CLASSES } from '../../../core/src/types.js';
  * app is built on — while costing a third of the time.
  */
 const PHONE_DEPTH = 12;
+
+/**
+ * Claude runs through Claude Code, which lives on a computer. This copy of the app
+ * reads what Claude wrote there and was carried here in an export, but cannot ask.
+ */
+const CLAUDE_ELSEWHERE =
+  'Claude reads games through Claude Code on your computer. Ask there, then export — the reading comes with the file.';
 
 export interface WorkerRequest {
   id: number;
@@ -198,6 +206,11 @@ async function route(request: WorkerRequest): Promise<unknown> {
       return { game: refreshed, moves: getMoves(handle, game.id) };
     }
 
+    if (tail === 'review') {
+      if (method === 'POST') throw new RouteError(CLAUDE_ELSEWHERE, 501);
+      return { review: readGameReview(handle, game) };
+    }
+
     return { game, moves: getMoves(handle, game.id) };
   }
 
@@ -319,6 +332,7 @@ async function route(request: WorkerRequest): Promise<unknown> {
     }
 
     if (tail === 'coaching') {
+      if (method === 'POST') throw new RouteError(CLAUDE_ELSEWHERE, 501);
       const cached = readCachedCoaching(handle, player.id, lens);
       if (cached && url.searchParams.get('refresh') !== 'true') {
         return { scope: lens.scope, lens, coaching: cached, cached: true };

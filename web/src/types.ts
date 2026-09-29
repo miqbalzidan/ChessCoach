@@ -280,11 +280,32 @@ export interface Coaching {
   generatedAt: number;
 }
 
+/**
+ * Claude's reading of one game, after Stockfish's. The engine's numbers are what it
+ * read; this is what it made of them.
+ */
+export interface GameReview {
+  summary: string;
+  /** The moments that decided the game, in game order. Each names a ply on this game. */
+  turningPoints: Array<{ ply: number; title: string; explanation: string }>;
+  lesson: string;
+  /** Which recurring pattern this game repeated, when it did; otherwise empty. */
+  recurring: string;
+  model: string;
+  generatedAt: number;
+  /** The game was re-analysed after this was written, so its numbers may have moved. */
+  stale: boolean;
+}
+
 export interface Settings {
   analysisDepth: number;
   engine: string;
   engines: number;
-  coaching: 'claude' | 'offline';
+  /** Who writes the plain-language text: Claude, through Claude Code on the computer
+   *  running the server, or the offline summariser. A snapshot only carries text. */
+  coaching: 'claude' | 'offline' | 'snapshot';
+  /** Why Claude is not available, when it is not — in words for the page. */
+  coachingNote?: string;
   players: Player[];
   /** Only sent by the in-browser copy of the app, and only it can be false: a
    *  server's disk does not evaporate. False means this browser refused OPFS and
@@ -349,4 +370,7 @@ export interface Snapshot {
   lenses: Record<string, SnapshotScope>;
   /** Version 1 snapshots, keyed by time class alone. Read on load, never written. */
   scopes?: Record<Scope, SnapshotScope>;
+  /** Game id → Claude's reading of it, for the games that have one. Absent from
+   *  snapshots written before games could be read. */
+  reviews?: Record<string, GameReview>;
 }

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { inSnapshotMode } from '../snapshot';
+import { inLocalMode } from '../engine/local';
 import { Board } from '../components/Board';
 import { EvalGraph } from '../components/EvalGraph';
+import { GameReading } from '../components/GameReading';
 import { ErrorNote, Loading } from '../components/Chrome';
 import {
   formatClock,
@@ -15,7 +17,14 @@ import {
 } from '../format';
 import { playMoveSound, setSoundEnabled, soundEnabled } from '../sound';
 import { analysisBoardUrl, chesscomAnalysisUrl, lessonFor, motifsOf } from '../links';
-import { GLYPH, VERDICT, type Classification, type Game, type Move } from '../types';
+import {
+  GLYPH,
+  VERDICT,
+  type Classification,
+  type Game,
+  type GameReview,
+  type Move,
+} from '../types';
 import { winPercent } from '../../../core/src/evaluation.js';
 import { Verdict } from '../components/Verdict';
 
@@ -43,7 +52,30 @@ export function Review() {
   const [error, setError] = useState<string | null>(null);
   const [analysing, setAnalysing] = useState(false);
   const [sound, setSound] = useState(soundEnabled);
+  const [review, setReview] = useState<GameReview | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [readingError, setReadingError] = useState<string | null>(null);
   const lastPly = useRef<number | null>(null);
+  const grid = useRef<HTMLDivElement | null>(null);
+
+  // Claude's reading, if the game has one. Its own request, so a game opens at the
+  // speed it always did, and a failure here is only a missing reading, never an
+  // error page — the engine's analysis stands on its own.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setReview(null);
+    setReadingError(null);
+    api
+      .gameReview(Number(id))
+      .then((response) => {
+        if (!cancelled) setReview(response.review);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -171,6 +203,33 @@ export function Review() {
     : 0;
   const whiteShare = Math.max(4, Math.min(96, evalToShare(evalCp)));
 
+  const askClaude = async () => {
+    setAsking(true);
+    setReadingError(null);
+    try {
+      const response = await api.askClaudeAboutGame(game.id);
+      setReview(response.review);
+    } catch (err) {
+      setReadingError(err instanceof ApiError ? err.message : 'Claude could not be reached');
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  // A turning point is read above the board, and on a laptop the board is then below
+  // the fold — so choosing one brings the board up, where Claude's note on the move
+  // is waiting beside it. Left alone when the board is already in view.
+  const toTurningPoint = (target: number) => {
+    setPly(target);
+    const top = grid.current?.getBoundingClientRect().top;
+    if (top !== undefined && (top > window.innerHeight * 0.5 || top < 0)) {
+      grid.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Where Claude said the game turned, when the board is on one of those moves.
+  const turningPoint = review?.turningPoints.find((point) => point.ply === ply) ?? null;
+
   const runAnalysis = async () => {
     setAnalysing(true);
     try {
@@ -282,9 +341,21 @@ export function Review() {
           actually arrive with — when did it turn — and clicking takes you there. */}
       <EvalGraph moves={moves} playerColor={playerColor} ply={ply} onSelect={setPly} />
 
+      {/* Why it turned, read off the same analysis by Claude. */}
+      <GameReading
+        review={review}
+        moves={moves}
+        ply={ply}
+        onSelect={toTurningPoint}
+        canAsk={!inSnapshotMode() && !inLocalMode()}
+        asking={asking}
+        error={readingError}
+        onAsk={askClaude}
+      />
+
       {/* A square is the one fixed shape here, so the grid is eval strip + fluid
           board + sheet — an asymmetry the content dictates. */}
-      <div className="review-grid">
+      <div className="review-grid" ref={grid}>
         <div
           className="eval-strip"
           aria-hidden="true"
@@ -379,9 +450,17 @@ export function Review() {
               ⏭
             </button>
           </div>
+
+          {/* On a phone the sheet is the whole move list further down, so Claude's
+              note sits here, under the position it describes. */}
+          {turningPoint ? <TurningPointNote point={turningPoint} where="board" /> : null}
         </div>
 
         <div className="move-sheet">
+          {/* Wide enough for two columns, it heads the sheet instead — beside the
+              board, where a tall board would otherwise push it out of view. */}
+          {turningPoint ? <TurningPointNote point={turningPoint} where="sheet" /> : null}
+
           {/* The move list filters by annotation glyph rather than asking you to
               scroll 41 moves. */}
           <div className="move-filters">
@@ -489,6 +568,27 @@ export function Review() {
             </div>
           ) : null}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Claude's word on the move on the board, when it picked that move as one that
+ * decided the game. Drawn in two places and shown in one, by width — see the styles.
+ */
+function TurningPointNote({
+  point,
+  where,
+}: {
+  point: { title: string; explanation: string };
+  where: 'board' | 'sheet';
+}) {
+  return (
+    <div className={`ink-panel reading-here reading-here-${where}`}>
+      <div className="label-sm reading-here-label">claude · {point.title}</div>
+      <div className="coach-prose" style={{ marginTop: 12, fontSize: 15 }}>
+        {point.explanation}
       </div>
     </div>
   );

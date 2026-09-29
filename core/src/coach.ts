@@ -3,9 +3,9 @@
  *
  * Everything here runs anywhere: the brief that gets handed to Claude, the offline
  * summariser that writes the same shape deterministically, and the per-lens cache.
- * Only the API call itself needs a key and a network, and that lives in
- * `server/src/coach-claude.ts` — which is why a phone with no key still gets a
- * written summary rather than an empty panel.
+ * Only asking Claude needs Claude Code on a computer, and that lives in
+ * `server/src/coach-claude.ts` — which is why a phone still gets a written summary
+ * rather than an empty panel.
  */
 import { z } from 'zod';
 import type { DB } from './db.js';
@@ -163,8 +163,8 @@ export function emptyCoaching(): z.infer<typeof CoachingSchema> {
 
 /**
  * The deterministic summary. It says less than the model would, but everything it
- * says is read straight off the same numbers, so the product still works without
- * an API key.
+ * says is read straight off the same numbers, so the product works fully without
+ * Claude.
  */
 export function fallbackCoaching(input: CoachingInput): z.infer<typeof CoachingSchema> {
   const { patterns, stats } = input;
@@ -207,8 +207,8 @@ export function fallbackCoaching(input: CoachingInput): z.infer<typeof CoachingS
  *
  * Both hosts need the same two-step decision — nothing to say yet, versus the
  * deterministic summary — so it lives here rather than being written once in the
- * server's Claude path and again in the phone's Worker. The phone has no API key and
- * nowhere safe to keep one, so for it this is not a fallback: it is the writer.
+ * server and again in the phone's Worker. The phone has no Claude Code to ask, so for
+ * it this is not a fallback: it is the writer.
  */
 export function offlineCoaching(input: CoachingInput): Coaching {
   if (input.patterns.length === 0) {
