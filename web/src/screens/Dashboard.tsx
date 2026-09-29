@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
+import { inSnapshotMode } from '../snapshot';
+import { inLocalMode } from '../engine/local';
 import { BaselineBars } from '../components/BaselineBars';
 import { Verdict } from '../components/Verdict';
 import {
@@ -44,6 +46,8 @@ export function Dashboard({
   const [data, setData] = useState<DashboardData | null>(null);
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [coaching, setCoaching] = useState<Coaching | null>(null);
+  const [askingClaude, setAskingClaude] = useState(false);
+  const [claudeError, setClaudeError] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,6 +89,7 @@ export function Dashboard({
     if (!username) return;
     let cancelled = false;
     setCoaching(null);
+    setClaudeError(null);
     api
       .coaching(username, lens)
       .then((response) => {
@@ -107,6 +112,25 @@ export function Dashboard({
       </Empty>
     );
   }
+
+  /**
+   * Claude rewrites the summary for the lens on screen. Asked for, never automatic:
+   * every opening and time class is its own lens, and browsing them should not spend
+   * a run of the plan on each.
+   */
+  const askClaude = async () => {
+    setAskingClaude(true);
+    setClaudeError(null);
+    try {
+      const response = await api.askClaudeForCoaching(username, lens);
+      setCoaching(response.coaching);
+    } catch (err) {
+      setClaudeError(err instanceof ApiError ? err.message : 'Claude could not be reached');
+    } finally {
+      setAskingClaude(false);
+    }
+  };
+  const canAskClaude = !inSnapshotMode() && !inLocalMode() && patterns.length > 0;
 
   if (loading && !data) return <Loading label="reading the sheet" />;
   if (error) return <ErrorNote error={error} />;
@@ -402,6 +426,24 @@ export function Dashboard({
               }}
             >
               {coaching.diagnosis}
+              <div className="coach-by">
+                <span>{writtenBy(coaching.model)}</span>
+                {canAskClaude ? (
+                  <button
+                    type="button"
+                    className="btn btn-on-ink btn-sm"
+                    onClick={askClaude}
+                    disabled={askingClaude}
+                  >
+                    {askingClaude
+                      ? 'Claude is writing…'
+                      : isClaude(coaching.model)
+                        ? 'ask Claude again'
+                        : 'ask Claude'}
+                  </button>
+                ) : null}
+              </div>
+              {claudeError ? <div className="coach-error">{claudeError}</div> : null}
             </div>
           )}
         </aside>
@@ -608,4 +650,15 @@ function severityOf(pattern: Pattern): Classification {
   if (pattern.glyph === '??') return 'blunder';
   if (pattern.glyph === '?') return 'mistake';
   return 'inaccuracy';
+}
+
+/** Who wrote the summary, in the words the page uses. */
+function writtenBy(model: string): string {
+  if (model === 'none') return 'nothing to summarise yet';
+  if (!isClaude(model)) return 'written offline, from the numbers alone';
+  return `written by Claude (${model})`;
+}
+
+function isClaude(model: string): boolean {
+  return model.startsWith('claude');
 }

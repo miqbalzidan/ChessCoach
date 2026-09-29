@@ -15,7 +15,6 @@
     "reclassify": "tsx src/reclassify.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.126.0",
     "better-sqlite3": "^13.0.3",
     "chess.js": "^1.4.0",
     "cors": "^2.8.5",

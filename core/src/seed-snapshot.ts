@@ -23,6 +23,7 @@
  */
 import type { DB } from './db.js';
 import type { GameRow, MoveRow, PlayerRow } from './store.js';
+import { writeGameReview, type GameReviewBody } from './game-review.js';
 
 /**
  * What seeding needs out of a snapshot, described structurally.
@@ -39,6 +40,8 @@ export interface SnapshotSeed {
   games: Array<Omit<GameRow, 'pgn' | 'created_at'> & { pgn?: string }>;
   /** Game id as a string, because this arrives as JSON. */
   moves: Record<string, MoveRow[]>;
+  /** Claude's readings, by the same game ids. Older exports have none. */
+  reviews?: Record<string, GameReviewBody & { model: string; generatedAt: number; stale?: boolean }>;
 }
 
 export interface SeedResult {
@@ -166,6 +169,14 @@ export function seedFromSnapshot(db: DB, snapshot: SnapshotSeed): SeedResult {
       for (const move of snapshot.moves[String(game.id)] ?? []) {
         insertMove.run(moveRow(move, gameId));
         result.moves += 1;
+      }
+
+      // Claude cannot be asked from a phone, so a reading that arrives here is the
+      // only one this game will get on this device. One already out of date stays
+      // out of date: the analysis it is keyed to is left unmatched on purpose.
+      const review = snapshot.reviews?.[String(game.id)];
+      if (review) {
+        writeGameReview(db, { id: gameId, analysed_at: review.stale ? null : game.analysed_at }, review);
       }
     }
   });

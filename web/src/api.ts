@@ -3,6 +3,7 @@ import type {
   Dashboard,
   Game,
   GameResult,
+  GameReview,
   Job,
   Lens,
   Move,
@@ -158,6 +159,13 @@ export const api = {
 
   analyseGame: (id: number) => post<{ game: Game; moves: Move[] }>(`/games/${id}/analyse`, {}),
 
+  /** Claude's reading of a game, if it has been read. Never asks Claude. */
+  gameReview: (id: number) => request<{ review: GameReview | null }>(`/games/${id}/review`),
+
+  /** Has Claude read the game now, through Claude Code on the computer. Takes a minute. */
+  askClaudeAboutGame: (id: number) =>
+    post<{ review: GameReview }>(`/games/${id}/review`, {}),
+
   dashboard: (username: string, lens: Lens) =>
     request<Dashboard>(`/players/${encodeURIComponent(username)}/dashboard?${lensQuery(lens)}`),
 
@@ -180,6 +188,13 @@ export const api = {
   coaching: (username: string, lens: Lens, refresh = false) =>
     request<{ scope: Scope; lens: Lens; coaching: Coaching; cached: boolean }>(
       `/players/${encodeURIComponent(username)}/coaching?${lensQuery(lens, { refresh: String(refresh) })}`,
+    ),
+
+  /** Has Claude write this lens's summary, replacing the one there. */
+  askClaudeForCoaching: (username: string, lens: Lens) =>
+    post<{ scope: Scope; lens: Lens; coaching: Coaching; cached: boolean }>(
+      `/players/${encodeURIComponent(username)}/coaching?${lensQuery(lens)}`,
+      {},
     ),
 
   /** The whole analysed player, as the object an export file carries. */

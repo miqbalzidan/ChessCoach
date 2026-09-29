@@ -135,6 +135,16 @@ export function migrate(db: DB): void {
       UNIQUE (player_id, lens)
     );
 
+    -- Claude's reading of one game. Keyed to the analysis it read, so a re-analysis
+    -- shows the old reading as out of date rather than silently mismatched.
+    CREATE TABLE IF NOT EXISTS game_reviews (
+      game_id     INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+      body        TEXT NOT NULL,
+      model       TEXT NOT NULL,
+      analysed_at INTEGER,
+      created_at  INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL

@@ -22,7 +22,8 @@ import { detectPatterns } from '../../core/src/patterns.js';
 import { profile } from '../../core/src/profile.js';
 import { MOTIF_LABELS } from '../../core/src/motifs.js';
 import { readCachedCoaching, writeCachedCoaching } from '../../core/src/coach.js';
-import type { Coaching, Lens, Scope, Snapshot, SnapshotScope } from './types.js';
+import { readGameReview } from '../../core/src/game-review.js';
+import type { Coaching, GameReview, Lens, Scope, Snapshot, SnapshotScope } from './types.js';
 import { lensKey, SNAPSHOT_VERSION } from './types.js';
 
 const SCOPES: Scope[] = ['all', 'bullet', 'blitz', 'rapid', 'daily'];
@@ -39,7 +40,7 @@ export interface BuildOptions {
    * Fill in coaching a lens has not got yet.
    *
    * Injected rather than imported, because the only implementation that can do it
-   * calls Claude over the network — which the server has and the phone does not.
+   * runs Claude Code on the computer — which the server has and the phone does not.
    * Left out, cached coaching is used where it exists and the rest stays null, which
    * is what the offline summariser already handles.
    */
@@ -68,10 +69,18 @@ export async function buildSnapshot(
   note(`${games.length} games`);
 
   const moves: Record<string, ReturnType<typeof getMoves>> = {};
+  // Claude's readings travel with the games they read. They were written on the
+  // computer, which is the only place Claude Code runs, and the phone is where
+  // they are most often read — on the way home from the game.
+  const reviews: Record<string, GameReview> = {};
   for (const game of games) {
-    if (game.analysed_at) moves[String(game.id)] = getMoves(db, game.id);
+    if (!game.analysed_at) continue;
+    moves[String(game.id)] = getMoves(db, game.id);
+    const review = readGameReview(db, game);
+    if (review) reviews[String(game.id)] = review;
   }
   note(`${Object.values(moves).reduce((sum, list) => sum + list.length, 0)} moves`);
+  if (Object.keys(reviews).length > 0) note(`${Object.keys(reviews).length} games read by Claude`);
 
   // The phone can compute nothing, so a lens that is not exported cannot be looked
   // through. Every lens the picker can reach is written: each time class, and each
@@ -110,6 +119,7 @@ export async function buildSnapshot(
     games: games.map(stripPgn),
     moves,
     lenses,
+    reviews,
   } as Snapshot;
 }
 
