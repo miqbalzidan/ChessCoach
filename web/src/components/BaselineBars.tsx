@@ -34,7 +34,7 @@ export function BaselineBars({
 
           const style = hasBlunder
             ? { top: mid, height: barHeight, background: 'var(--vermilion)' }
-            : { bottom: mid, height: barHeight, background: 'rgba(20,19,15,.62)' };
+            : { bottom: mid, height: barHeight, background: 'var(--muted-3)' };
 
           return (
             <button

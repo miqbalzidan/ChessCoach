@@ -114,7 +114,7 @@ export function Patterns({
   return (
     <>
       <div className="headline-row">
-        <h1 className="headline" style={{ fontSize: 'clamp(30px, 4.4vw, 62px)' }}>
+        <h1 className="headline" style={{ fontSize: 'calc(clamp(30px, 4.4vw, 62px) * var(--text-scale))' }}>
           {patterns.length > 0 ? (
             <>
               <em>{patterns.length}</em> leaks,
@@ -152,7 +152,7 @@ export function Patterns({
             <div className="label">the short version</div>
             <div
               className="coach-prose"
-              style={{ marginTop: 12, fontSize: 20, lineHeight: 1.45, maxWidth: '46ch' }}
+              style={{ marginTop: 12, fontSize: 'calc(20px * var(--text-scale))', lineHeight: 1.45, maxWidth: '46ch' }}
             >
               {coaching.diagnosis}
             </div>

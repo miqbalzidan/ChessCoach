@@ -26,6 +26,7 @@
     "../web/src/links.ts",
     "../web/src/format.ts",
     "../web/src/graph.ts",
+    "../web/src/appearance.ts",
     "../web/src/snapshot-build.ts"
   ]
 }

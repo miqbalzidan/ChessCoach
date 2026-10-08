@@ -4,6 +4,7 @@ import { ErrorNote, Loading } from '../components/Chrome';
 import { pluralise, relativeTime } from '../format';
 import { downloadSnapshot, inSnapshotMode } from '../snapshot';
 import { SnapshotSettings } from './SnapshotSettings';
+import { Appearance } from '../components/Appearance';
 import { LocalDevice } from './LocalDevice';
 import type { Job, Settings as SettingsData } from '../types';
 
@@ -66,6 +67,7 @@ export function Settings({
       <>
         {error ? <ErrorNote error={error} /> : <Loading label="loading settings" />}
         <LocalDevice onSeeded={onChanged} />
+        <Appearance />
       </>
     );
   }
@@ -141,7 +143,7 @@ export function Settings({
   return (
     <>
       <div className="headline-row">
-        <h1 className="headline" style={{ fontSize: 'clamp(30px, 4vw, 54px)' }}>
+        <h1 className="headline" style={{ fontSize: 'calc(clamp(30px, 4vw, 54px) * var(--text-scale))' }}>
           Settings.
         </h1>
         <div className="headline-aside">
@@ -175,7 +177,7 @@ export function Settings({
                     background: 'none',
                     border: 0,
                     padding: 0,
-                    font: '600 19px/1.2 var(--display)',
+                    font: '600 calc(19px * var(--text-scale))/1.2 var(--display)',
                     color: player.username === activeUsername ? 'var(--vermilion)' : 'var(--ink)',
                   }}
                 >
@@ -237,7 +239,7 @@ export function Settings({
 
       <div style={{ margin: '0 var(--margin)', paddingBottom: 48, maxWidth: 620 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 18 }}>
-          <div className="numeric" style={{ font: '800 62px/0.9 var(--display)' }}>
+          <div className="numeric" style={{ font: '800 calc(62px * var(--text-scale))/0.9 var(--display)' }}>
             {depth}
           </div>
           <div className="prose">
@@ -296,6 +298,8 @@ export function Settings({
 
         <LocalDevice onSeeded={onChanged} />
       </div>
+
+      <Appearance />
     </>
   );
 }

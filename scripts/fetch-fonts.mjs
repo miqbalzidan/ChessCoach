@@ -1,5 +1,5 @@
 /**
- * Pulls the four typefaces down from Google Fonts and self-hosts them.
+ * Pulls the typefaces down from Google Fonts and self-hosts them.
  *
  * Two reasons, and the second is the one that matters: a snapshot opened on a phone
  * with no network must still look like the thing that was designed. The display face
@@ -10,20 +10,49 @@
  * vietnamese) is weight this app never renders. The chess figurines are not in these
  * fonts at all; they come from the system.
  *
- * Run: node scripts/fetch-fonts.mjs
+ * Two sets. `core` is the four faces the design is drawn in; they are precached and
+ * inlined into every export. `extra` is what Settings lets you switch to; it lives in
+ * its own directory so the offline cache can skip it until a face is actually chosen,
+ * and so exports can leave it out.
+ *
+ * Run: node scripts/fetch-fonts.mjs [core|extra]   (both when no set is named)
  */
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const CSS_URL =
-  'https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;0,6..96,800;1,6..96,400;1,6..96,600&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap';
+const SETS = {
+  core: {
+    url: 'https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;0,6..96,800;1,6..96,400;1,6..96,600&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap',
+    dir: '',
+    css: 'fonts.css',
+  },
+  // Variable where Google has them, so one file per style covers every weight the
+  // sheet uses (400 to 800) — the same trick that makes Bodoni one file, not three.
+  extra: {
+    url:
+      'https://fonts.googleapis.com/css2?' +
+      [
+        'family=Playfair+Display:ital,wght@0,400..800;1,400..800',
+        'family=Fraunces:ital,wght@0,400..800;1,400..800',
+        'family=Space+Grotesk:wght@400..700',
+        'family=Inter:ital,wght@0,400..700;1,400..700',
+        'family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700',
+        'family=Literata:ital,wght@0,400..700;1,400..700',
+        'family=Source+Serif+4:ital,wght@0,400..700;1,400..700',
+        'family=JetBrains+Mono:ital,wght@0,400..700;1,400..700',
+      ].join('&') +
+      '&display=swap',
+    dir: 'extra',
+    css: 'extra.css',
+  },
+};
 
 // Asking as a current browser is what gets woff2 rather than a legacy format.
 const UA =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-const OUT_DIR = resolve(import.meta.dirname, '../web/public/fonts');
+const FONTS_DIR = resolve(import.meta.dirname, '../web/public/fonts');
 
 /** The basic latin block. A face that cannot render "a" is not one we need. */
 function isLatin(block) {
@@ -35,78 +64,89 @@ function fieldOf(block, name) {
   return /** @type {string} */ (new RegExp(`${name}:\\s*([^;]+);`).exec(block)?.[1] ?? '').trim();
 }
 
-const response = await fetch(CSS_URL, { headers: { 'User-Agent': UA } });
-if (!response.ok) throw new Error(`Google Fonts said ${response.status}`);
-const css = await response.text();
+async function fetchSet(name, set) {
+  console.log(`${name}:`);
+  const OUT_DIR = resolve(FONTS_DIR, set.dir);
+  const response = await fetch(set.url, { headers: { 'User-Agent': UA } });
+  if (!response.ok) throw new Error(`Google Fonts said ${response.status}`);
+  const css = await response.text();
 
-const blocks = css
-  .split('@font-face')
-  .slice(1)
-  .map((block) => block.slice(0, block.indexOf('}') + 1));
+  const blocks = css
+    .split('@font-face')
+    .slice(1)
+    .map((block) => block.slice(0, block.indexOf('}') + 1));
 
-mkdirSync(OUT_DIR, { recursive: true });
+  mkdirSync(OUT_DIR, { recursive: true });
 
-const kept = [];
-// Bodoni Moda is a variable font, so Google serves byte-identical files for 400, 600
-// and 800 — three names for one thing. Keyed by content, each is stored once and the
-// weights point at the same file.
-const byContent = new Map();
-let bytes = 0;
+  const kept = [];
+  // Bodoni Moda is a variable font, so Google serves byte-identical files for 400, 600
+  // and 800 — three names for one thing. Keyed by content, each is stored once and the
+  // weights point at the same file.
+  const byContent = new Map();
+  let bytes = 0;
 
-for (const block of blocks) {
-  if (!isLatin(block)) continue;
+  for (const block of blocks) {
+    if (!isLatin(block)) continue;
 
-  const url = /url\((https:[^)]+)\)/.exec(block)?.[1];
-  if (!url) continue;
+    const url = /url\((https:[^)]+)\)/.exec(block)?.[1];
+    if (!url) continue;
 
-  const family = fieldOf(block, 'font-family').replace(/['"]/g, '');
-  const weight = fieldOf(block, 'font-weight');
-  const style = fieldOf(block, 'font-style');
-  const stretch = fieldOf(block, 'font-stretch');
+    const family = fieldOf(block, 'font-family').replace(/['"]/g, '');
+    const weight = fieldOf(block, 'font-weight');
+    const style = fieldOf(block, 'font-style');
+    const stretch = fieldOf(block, 'font-stretch');
 
-  const font = await fetch(url, { headers: { 'User-Agent': UA } });
-  if (!font.ok) throw new Error(`${family} ${style} ${weight}: ${font.status}`);
-  const buffer = Buffer.from(await font.arrayBuffer());
+    const font = await fetch(url, { headers: { 'User-Agent': UA } });
+    if (!font.ok) throw new Error(`${family} ${style} ${weight}: ${font.status}`);
+    const buffer = Buffer.from(await font.arrayBuffer());
 
-  const digest = createHash('sha256').update(buffer).digest('hex').slice(0, 8);
-  let file = byContent.get(digest);
-  if (!file) {
-    file = `${family.toLowerCase().replace(/\s+/g, '-')}-${style}-${digest}.woff2`;
-    writeFileSync(resolve(OUT_DIR, file), buffer);
-    byContent.set(digest, file);
-    bytes += buffer.length;
-    console.log(`  ${file.padEnd(44)} ${(buffer.length / 1024).toFixed(1)} KB`);
-  } else {
-    console.log(`  ${`${family} ${style} ${weight}`.padEnd(44)} → ${file}`);
+    const digest = createHash('sha256').update(buffer).digest('hex').slice(0, 8);
+    let file = byContent.get(digest);
+    if (!file) {
+      file = `${family.toLowerCase().replace(/\s+/g, '-')}-${style}-${digest}.woff2`;
+      writeFileSync(resolve(OUT_DIR, file), buffer);
+      byContent.set(digest, file);
+      bytes += buffer.length;
+      console.log(`  ${file.padEnd(44)} ${(buffer.length / 1024).toFixed(1)} KB`);
+    } else {
+      console.log(`  ${`${family} ${style} ${weight}`.padEnd(44)} → ${file}`);
+    }
+
+    kept.push(
+      [
+        '@font-face {',
+        `  font-family: '${family}';`,
+        `  font-style: ${style};`,
+        `  font-weight: ${weight};`,
+        stretch ? `  font-stretch: ${stretch};` : null,
+        '  font-display: swap;',
+        // Relative, and deliberately so. This stylesheet sits in the same directory as
+        // the files it names, and a CSS url() resolves against the stylesheet's own
+        // location — so `./x.woff2` is correct whether the site is served from a domain
+        // root or from a project page under /<repo>/. An absolute `/fonts/x.woff2`
+        // looks right, survives every test done at the root, and then 404s on a
+        // subpath, where the page silently falls back to a system serif. Vite does not
+        // rewrite this for us: files in public/ are copied verbatim, not processed.
+        `  src: url(./${file}) format('woff2');`,
+        '}',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+
   }
 
-  kept.push(
-    [
-      '@font-face {',
-      `  font-family: '${family}';`,
-      `  font-style: ${style};`,
-      `  font-weight: ${weight};`,
-      stretch ? `  font-stretch: ${stretch};` : null,
-      '  font-display: swap;',
-      // Relative, and deliberately so. This stylesheet sits in the same directory as
-      // the files it names, and a CSS url() resolves against the stylesheet's own
-      // location — so `./x.woff2` is correct whether the site is served from a domain
-      // root or from a project page under /<repo>/. An absolute `/fonts/x.woff2`
-      // looks right, survives every test done at the root, and then 404s on a
-      // subpath, where the page silently falls back to a system serif. Vite does not
-      // rewrite this for us: files in public/ are copied verbatim, not processed.
-      `  src: url(./${file}) format('woff2');`,
-      '}',
-    ]
-      .filter(Boolean)
-      .join('\n'),
-  );
+  const header = `/* Generated by scripts/fetch-fonts.mjs — do not edit.
+     Latin subsets only, self-hosted so an exported snapshot renders with no network. */\n\n`;
+  writeFileSync(resolve(OUT_DIR, set.css), header + kept.join('\n\n') + '\n');
 
+  console.log(`\n${kept.length} faces over ${byContent.size} files, ${(bytes / 1024).toFixed(0)} KB total`);
+  console.log(`written to ${OUT_DIR}`);
 }
 
-const header = `/* Generated by scripts/fetch-fonts.mjs — do not edit.
-   Latin subsets only, self-hosted so an exported snapshot renders with no network. */\n\n`;
-writeFileSync(resolve(OUT_DIR, 'fonts.css'), header + kept.join('\n\n') + '\n');
-
-console.log(`\n${kept.length} faces over ${byContent.size} files, ${(bytes / 1024).toFixed(0)} KB total`);
-console.log(`written to ${OUT_DIR}`);
+const requested = process.argv.slice(2);
+for (const name of requested.length > 0 ? requested : Object.keys(SETS)) {
+  const set = SETS[name];
+  if (!set) throw new Error(`No font set called ${name}; there are ${Object.keys(SETS).join(' and ')}`);
+  await fetchSet(name, set);
+}

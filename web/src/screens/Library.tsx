@@ -89,7 +89,7 @@ export function Library({
   return (
     <>
       <div className="headline-row">
-        <h1 className="headline" style={{ fontSize: 'clamp(30px, 4vw, 54px)' }}>
+        <h1 className="headline" style={{ fontSize: 'calc(clamp(30px, 4vw, 54px) * var(--text-scale))' }}>
           {pluralise(total, 'game')}.
         </h1>
         <div className="headline-aside">
@@ -187,7 +187,7 @@ export function Library({
               >
                 <span className="meta numeric game-date">{formatDate(game.end_time)}</span>
                 <span className="game-opponent">
-                  <span style={{ font: '600 15px/1.2 var(--display)' }}>{game.opponent}</span>
+                  <span style={{ font: '600 calc(15px * var(--text-scale))/1.2 var(--display)' }}>{game.opponent}</span>
                   <span className="meta">
                     {' '}
                     {game.opponent_rating ?? ''} · as {game.player_color}
