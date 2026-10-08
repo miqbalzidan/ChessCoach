@@ -1,7 +1,7 @@
 import type { DB } from './db.js';
 import type { EnginePool } from './engine.js';
 import { ChessComError, fetchGames, normaliseGame } from './chesscom.js';
-import { analyseGame, parsePgn } from './analysis.js';
+import { analyseGame, NoMovesToAnalyse, parsePgn } from './analysis.js';
 import { insertGame, saveAnalysis, unanalysedGames, upsertPlayer } from './store.js';
 import { ecoNameFromHeaders } from './chesscom.js';
 import type { ImportedGame, TimeClass } from './types.js';
@@ -124,17 +124,32 @@ export async function analysePending(
   updateJob(db, jobId, { stage: 'analysing', total: pending.length, analysed: 0 });
 
   let analysed = 0;
+  let withoutMoves = 0;
   for (const game of pending) {
     try {
       const analysis = await analyseGame(pool, game.pgn, { depth });
       saveAnalysis(db, game, analysis);
     } catch (error) {
-      // One unparseable game should not abandon the rest of the import.
-      const message = error instanceof Error ? error.message : String(error);
-      updateJob(db, jobId, { message: `Skipped game ${game.id}: ${message}` });
+      if (error instanceof NoMovesToAnalyse) {
+        withoutMoves += 1;
+      } else {
+        // One unparseable game should not abandon the rest of the import.
+        const message = error instanceof Error ? error.message : String(error);
+        updateJob(db, jobId, { message: `Skipped game ${game.id}: ${message}` });
+      }
     }
     analysed += 1;
     updateJob(db, jobId, { analysed });
+  }
+
+  // Said once, at the end, rather than once per game: on a phone seeded from an export
+  // these are every game the computer had not got to, and they share one cause.
+  if (withoutMoves > 0) {
+    updateJob(db, jobId, {
+      message:
+        `${withoutMoves} ${withoutMoves === 1 ? 'game' : 'games'} came from the computer without ` +
+        'their moves, so they cannot be analysed here. Analyse them on the computer, then export again.',
+    });
   }
 }
 

@@ -14,7 +14,7 @@
  * The route table mirrors `server/src/api.ts` deliberately. That file is the
  * specification; where the two disagree, that one is right.
  */
-import { analyseGame } from '../../../core/src/analysis.js';
+import { analyseGame, NoMovesToAnalyse } from '../../../core/src/analysis.js';
 import { buildSnapshot } from '../snapshot-build.js';
 import { configureChessCom } from '../../../core/src/chesscom.js';
 import { getSetting, migrate, setSetting, type DB } from '../../../core/src/db.js';
@@ -199,6 +199,9 @@ async function route(request: WorkerRequest): Promise<unknown> {
     if (!game) throw new RouteError('No such game', 404);
 
     if (tail === 'analyse' && method === 'POST') {
+      // Checked before the engine is started: a game seeded from an export has no
+      // PGN, and there is no reason to wake Stockfish to find that out.
+      if (!game.pgn.trim()) throw new RouteError(new NoMovesToAnalyse(true).message, 409);
       const depth = optionalNumber(body.depth) ?? depthSetting(handle);
       const analysis = await analyseGame(await engines(), game.pgn, { depth });
       saveAnalysis(handle, game, analysis);

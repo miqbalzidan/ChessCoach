@@ -73,6 +73,27 @@ export function parseIncrement(timeControl: string | undefined): number {
  *  own settings — the server from the database, the phone from a lower default. */
 export const DEFAULT_DEPTH = 16;
 
+/**
+ * The game has no moves to read — so there is nothing to analyse, and nothing that
+ * may be saved as an analysis.
+ *
+ * This used to return an empty analysis at 100% accuracy for both sides, which every
+ * caller then saved as a finished game. On a phone that is a real case, not an edge:
+ * an export carries results but not PGNs, so a game the computer had imported and not
+ * yet analysed arrives with no moves, and "analyse this game" turned it into a
+ * flawless game that never happened and averaged it into the sheet.
+ */
+export class NoMovesToAnalyse extends Error {
+  constructor(pgnMissing: boolean) {
+    super(
+      pgnMissing
+        ? 'This game came from your computer before it was analysed, and an export carries results, not the moves themselves. Analyse it on the computer, then export again.'
+        : 'This game has no moves to analyse.',
+    );
+    this.name = 'NoMovesToAnalyse';
+  }
+}
+
 export interface AnalyseOptions {
   depth?: number;
   onProgress?: (done: number, total: number) => void;
@@ -89,10 +110,9 @@ export async function analyseGame(
   options: AnalyseOptions = {},
 ): Promise<GameAnalysis> {
   const depth = options.depth ?? DEFAULT_DEPTH;
+  if (pgn.trim() === '') throw new NoMovesToAnalyse(true);
   const parsed = parsePgn(pgn);
-  if (parsed.moves.length === 0) {
-    return { moves: [], accuracyWhite: 100, accuracyBlack: 100, depth, engine: pool.engineName };
-  }
+  if (parsed.moves.length === 0) throw new NoMovesToAnalyse(false);
 
   const positions = [parsed.moves[0]!.fenBefore, ...parsed.moves.map((m) => m.fenAfter)];
   let done = 0;

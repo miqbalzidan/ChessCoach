@@ -145,13 +145,16 @@ describe('analyseGame', () => {
     assert.equal(rookSac!.classification, 'brilliant');
   });
 
-  it('returns an empty analysis for a game with no moves', async (t) => {
-    const pool = createEnginePool(1, 16, 1);
-    t.after(() => pool.close());
-
-    const analysis = await analyseGame(pool, '[Event "empty"]\n\n*', { depth: 8 });
-    assert.deepEqual(analysis.moves, []);
-    assert.equal(analysis.accuracyWhite, 100);
+  // This used to return an empty analysis at 100% for both sides, which every caller
+  // saved as a finished, flawless game. Nothing about a game with no moves may be
+  // saved as analysis, so it is refused before the engine is asked anything.
+  it('refuses a game with no moves rather than calling it flawless', async () => {
+    const untouched = { engineName: 'never asked' } as unknown as EnginePool;
+    await assert.rejects(analyseGame(untouched, '[Event "empty"]\n\n*', { depth: 8 }), (error: Error) =>
+      error.name === 'NoMovesToAnalyse' && error.message === 'This game has no moves to analyse.',
+    );
+    // A game seeded from an export has no PGN at all, and says why.
+    await assert.rejects(analyseGame(untouched, '', { depth: 8 }), /export carries results, not the moves/);
   });
 });
 

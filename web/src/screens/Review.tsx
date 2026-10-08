@@ -51,6 +51,7 @@ export function Review() {
   const [filter, setFilter] = useState<Filter>('all');
   const [error, setError] = useState<string | null>(null);
   const [analysing, setAnalysing] = useState(false);
+  const [analyseError, setAnalyseError] = useState<string | null>(null);
   const [sound, setSound] = useState(soundEnabled);
   const [review, setReview] = useState<GameReview | null>(null);
   const [asking, setAsking] = useState(false);
@@ -232,16 +233,29 @@ export function Review() {
 
   const runAnalysis = async () => {
     setAnalysing(true);
+    setAnalyseError(null);
     try {
       const response = await api.analyseGame(game.id);
       setGame(response.game);
       setMoves(response.moves);
+      // Land where a freshly opened game lands: on the first serious mistake.
+      const firstBlunder = response.moves.find(
+        (move) => move.is_player === 1 && move.classification === 'blunder',
+      );
+      setPly(firstBlunder?.ply ?? 0);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Analysis failed');
+      // Said here, under the button, rather than in place of the whole page: the game
+      // is still there, and the reason is usually something the reader can act on.
+      setAnalyseError(err instanceof ApiError ? err.message : 'Analysis failed');
     } finally {
       setAnalysing(false);
     }
   };
+
+  // A game seeded onto a phone from an export arrives without its PGN — exports carry
+  // results, not moves — so a game the computer never analysed has nothing here to
+  // analyse. Undefined is different: list views and snapshots simply leave it out.
+  const movesMissing = game.pgn !== undefined && game.pgn.trim() === '';
 
   if (!game.analysed_at) {
     return (
@@ -257,10 +271,23 @@ export function Review() {
             A snapshot carries results, not the engine. Analyse this game on the computer
             and export again.
           </div>
+        ) : movesMissing ? (
+          <div className="prose">
+            This game came from your computer before it was analysed, and an export
+            carries results, not the moves themselves — so there is nothing here for the
+            engine to read. Analyse it on the computer, then export again.
+          </div>
         ) : (
-          <button type="button" className="btn" onClick={runAnalysis} disabled={analysing}>
-            {analysing ? 'analysing…' : 'analyse this game'}
-          </button>
+          <>
+            <button type="button" className="btn" onClick={runAnalysis} disabled={analysing}>
+              {analysing ? 'analysing…' : 'analyse this game'}
+            </button>
+            {analyseError ? (
+              <div className="prose" style={{ marginTop: 16, color: 'var(--vermilion-dark)' }}>
+                {analyseError}
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     );

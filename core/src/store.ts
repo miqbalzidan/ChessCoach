@@ -181,6 +181,8 @@ export function saveAnalysis(
      ON CONFLICT (game_id, ply) DO UPDATE SET
        eval_before = excluded.eval_before,
        eval_after = excluded.eval_after,
+       mate_before = excluded.mate_before,
+       mate_after = excluded.mate_after,
        cp_loss = excluded.cp_loss,
        win_percent_loss = excluded.win_percent_loss,
        accuracy = excluded.accuracy,
