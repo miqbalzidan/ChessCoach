@@ -1,3 +1,4 @@
+import { Appearance } from '../components/Appearance';
 import { useRef, useState } from 'react';
 import { formatDateTime, pluralise } from '../format';
 import { activeSnapshot, clearStoredSnapshot, importSnapshotFile } from '../snapshot';
@@ -99,6 +100,8 @@ export function SnapshotSettings() {
           {error}
         </div>
       )}
+
+      <Appearance />
     </>
   );
 }

@@ -259,8 +259,8 @@ export function Dashboard({
                     phase.phase === worstPhase?.phase
                       ? 'var(--vermilion)'
                       : phase.phase === 'opening'
-                        ? 'rgba(20,19,15,.16)'
-                        : 'rgba(20,19,15,.5)',
+                        ? 'var(--rule-soft)'
+                        : 'var(--muted-2)',
                 }}
                 title={`${phase.phase}: ${phase.share}% of mistakes, ${phase.rate} per 100 moves`}
               />
@@ -371,7 +371,7 @@ export function Dashboard({
                     With <em style={{ color: 'var(--vermilion-pale)' }}>{pressured.label}</em> on the
                     clock, your blunder rate multiplies by{' '}
                     <span
-                      style={{ font: '600 30px/1 var(--display)', color: '#fff', verticalAlign: '-4px' }}
+                      style={{ font: '600 calc(30px * var(--text-scale))/1 var(--display)', color: '#fff', verticalAlign: '-4px' }}
                       className="numeric"
                     >
                       {pressured.multiplier.toFixed(1)}
@@ -510,7 +510,7 @@ function Openings({
               }
             >
               <span className="meta numeric">{row.eco}</span>
-              <span style={{ font: '600 15px/1.2 var(--display)' }}>{row.name}</span>
+              <span style={{ font: '600 calc(15px * var(--text-scale))/1.2 var(--display)' }}>{row.name}</span>
               <span className="meta">{row.color}</span>
               <span className="numeric" style={{ textAlign: 'right' }}>
                 {row.games}
@@ -520,7 +520,7 @@ function Openings({
               </span>
               <span
                 className="numeric"
-                style={{ textAlign: 'right', font: '600 17px/1 var(--display)' }}
+                style={{ textAlign: 'right', font: '600 calc(17px * var(--text-scale))/1 var(--display)' }}
               >
                 {row.winRate.toFixed(0)}%
               </span>

@@ -302,7 +302,7 @@ export function Review() {
             <span className={`result-${game.result}`}>{game.result}</span>
             {game.eco ? ` · ${game.eco_name ?? ''} (${game.eco})` : ''}
           </div>
-          <div style={{ font: '600 30px/1.1 var(--display)', marginTop: 7 }}>
+          <div style={{ font: '600 calc(30px * var(--text-scale))/1.1 var(--display)', marginTop: 7 }}>
             {game.white_username} <span style={{ color: 'var(--muted)' }}>vs</span>{' '}
             {game.black_username}
           </div>
@@ -347,7 +347,7 @@ export function Review() {
           </div>
           <div>
             <div className="label-sm">you</div>
-            <div className="numeric" style={{ font: '600 34px/1 var(--display)' }}>
+            <div className="numeric" style={{ font: '600 calc(34px * var(--text-scale))/1 var(--display)' }}>
               {playerAccuracy?.toFixed(1) ?? '—'}
             </div>
           </div>
@@ -355,7 +355,7 @@ export function Review() {
             <div className="label-sm">them</div>
             <div
               className="numeric"
-              style={{ font: '600 34px/1 var(--display)', color: 'var(--muted)' }}
+              style={{ font: '600 calc(34px * var(--text-scale))/1 var(--display)', color: 'var(--muted)' }}
             >
               {opponentAccuracy?.toFixed(1) ?? '—'}
             </div>
@@ -574,7 +574,7 @@ export function Review() {
               >
                 {brilliant ? 'why this was brilliant' : 'what happened here'}
               </div>
-              <div className="coach-prose" style={{ marginTop: 12, fontSize: 15 }}>
+              <div className="coach-prose" style={{ marginTop: 12, fontSize: 'calc(15px * var(--text-scale))' }}>
                 {brilliant ? describeBrilliance(current) : describeMove(current)}
               </div>
               {(() => {
@@ -614,7 +614,7 @@ function TurningPointNote({
   return (
     <div className={`ink-panel reading-here reading-here-${where}`}>
       <div className="label-sm reading-here-label">claude · {point.title}</div>
-      <div className="coach-prose" style={{ marginTop: 12, fontSize: 15 }}>
+      <div className="coach-prose" style={{ marginTop: 12, fontSize: 'calc(15px * var(--text-scale))' }}>
         {point.explanation}
       </div>
     </div>

@@ -150,7 +150,7 @@ export function Import({ onImported }: { onImported: (username: string) => void 
   return (
     <>
       <div className="headline-row">
-        <h1 className="headline" style={{ fontSize: 'clamp(30px, 4.6vw, 64px)' }}>
+        <h1 className="headline" style={{ fontSize: 'calc(clamp(30px, 4.6vw, 64px) * var(--text-scale))' }}>
           Bring in
           <br />
           your <em>games</em>.

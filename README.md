@@ -25,6 +25,13 @@ class, with a plain-language coaching layer on top.
   on it to put the board there. It is drawn from your side whichever colour you had,
   the same way round as the board and the eval bar, so a cliff is always your own fall
 - Both players' names, ratings and accuracy either side of the board
+- **Appearance, per device** (Settings → appearance): light, dark, or following the
+  system as it changes; four text sizes that grow the type and leave the board alone;
+  and a choice of typeface for headlines, the interface, reading and chess notation —
+  the designed four, eight more (Playfair Display, Fraunces, Space Grotesk, Inter,
+  Atkinson Hyperlegible, Literata, Source Serif 4, JetBrains Mono), or the device's own.
+  Each choice previews in itself and applies at once, and the theme is in place before
+  the first paint, so a dark sheet never flashes white
 - Pieces slide, and moves, captures and checks each sound different — synthesised in
   the browser, so no audio files and nothing to download
 - Right-click a square to highlight it, right-drag for an arrow, left-click to clear
@@ -299,9 +306,12 @@ Without Claude Code the app still works end to end — the coaching text is gene
 deterministically from the same numbers, in fewer words, and games simply have no
 reading.
 
-The three typefaces are self-hosted from `web/public/fonts` (latin subsets, 224 KB over
-nine files) rather than fetched from Google, because an exported snapshot has to render
-with no network at all. `npm run fonts` regenerates them.
+The four designed typefaces are self-hosted from `web/public/fonts` (latin subsets, 224 KB
+over nine files) rather than fetched from Google, because an exported snapshot has to
+render with no network at all. The eight you can switch to in Settings live in
+`web/public/fonts/extra` (586 KB): left out of the offline install and out of exports, and
+fetched the first time one is shown, then cached. `npm run fonts` regenerates both;
+`npm run fonts -- extra` (or `core`) just one set.
 
 ---
 

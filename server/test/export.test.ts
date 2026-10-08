@@ -90,6 +90,17 @@ describe('snapshot inlining', () => {
     assert.ok(html.includes(`<script type="module">${bundle}</script>`));
   });
 
+  // The typefaces you can switch to would add most of a megabyte to every export, and
+  // an export opened offline could not fetch them anyway — it keeps the designed ones.
+  test('the switchable typefaces are left out of the file', () => {
+    const template = TEMPLATE.replace(
+      '</head>',
+      '<link rel="stylesheet" href="/fonts/extra/extra.css" data-fonts="extra" />\n</head>',
+    );
+    const html = inlineIntoHtml(template, fixtureSnapshot(), fixtureDist('var x=1;'));
+    assert.ok(!html.includes('fonts/extra'), 'the extra fonts stylesheet survived');
+  });
+
   test('nothing is left pointing at the network or the filesystem root', () => {
     const html = inlineIntoHtml(TEMPLATE, fixtureSnapshot(), fixtureDist('var x=1;'));
     assert.ok(!html.includes('href="/assets'), 'stylesheet still external');

@@ -66,6 +66,9 @@ export function inlineIntoHtml(
 
   // The icon can ride along as a data URI; the manifest cannot mean anything here.
   html = html
+    // The switchable typefaces stay out of a file meant to need nothing: inlined they
+    // would add most of a megabyte, and a reader of an export sees the designed faces.
+    .replace(/<link[^>]*data-fonts="extra"[^>]*>\s*/g, '')
     .replace(/<link[^>]*rel="manifest"[^>]*>\s*/g, '')
     .replace(
       /<link([^>]*)href="\/(icon-192\.png)"([^>]*)>/g,

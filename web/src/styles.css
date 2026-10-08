@@ -42,8 +42,29 @@
 
   --board-light: #efeadd;
   --board-dark: #b9a988;
+  --board-best: #2f6b4f;
   --mark: #3f7d8c;
+
+  /* The pieces' own colours. Fixed in both themes, because they mean White and
+     Black — the eval strip, the graph's two territories and the player discs are
+     pictures of the board, not parts of the page. */
   --piece-white: #f6f1e4;
+  --piece-black: #14130f;
+
+  /* Ink used to do two jobs: the colour of text, and the surface of the dark
+     panels and selected rows. A dark theme needs those apart — text turns light,
+     but a panel must not turn into a white slab — so the surfaces have their own.
+     Panels are the large ink blocks; inverse is a small selected state (an active
+     tab, the current move). Both stay dark with light text in either theme. */
+  --panel: #14130f;
+  --on-panel: #e8e2d4;
+  --panel-edge: transparent;
+  --inverse: #14130f;
+  --on-inverse: #e8e2d4;
+  --on-vermilion: #fff;
+  --muted-faint: rgba(20, 19, 15, 0.28);
+
+  color-scheme: light;
 
   --display: 'Bodoni Moda', 'Didot', 'Playfair Display', Georgia, 'Times New Roman', serif;
   /* The interface face. Monospace was carrying nearly all of the chrome, which suits
@@ -56,7 +77,70 @@
   --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
   --prose: 'Spectral', Georgia, 'Times New Roman', serif;
 
+  /* Every font size is written as calc(Npx * var(--text-scale)), so text can grow
+     without the board, the graph or the grid growing with it. Set from Settings. */
+  --text-scale: 1;
+
   --margin: 34px;
+}
+
+/* ---------- dark ----------
+   The same scoresheet at night: warm near-black paper, bone ink, and the verdict
+   colours lifted until each one reads at least as well against the dark page as
+   it did against the light one (every pair here was measured, and none is below
+   its light-theme counterpart). Panels and selected rows stay dark surfaces with
+   light text, a step lighter than the page so they still read as raised. The
+   board and the pieces keep their own colours, a little dimmed so the board is not
+   a lamp in the middle of the screen.
+
+   `data-theme` is always set to the resolved theme by the boot script in
+   index.html, so "follow the system" is resolved there and this is written once. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bone: #15140f;
+  --paper: #1f1d17;
+  --ink: #ebe5d7;
+  --ink-2: #c6bfae;
+  --ink-3: #d0c9b8;
+  --vermilion: #e5653f;
+  --vermilion-dark: #f08a69;
+  --vermilion-pale: #f2ad92;
+  --amber: #e08d64;
+
+  --rule: rgba(235, 229, 215, 0.2);
+  --rule-soft: rgba(235, 229, 215, 0.14);
+  --rule-faint: rgba(235, 229, 215, 0.09);
+  --muted: rgba(235, 229, 215, 0.5);
+  --muted-2: rgba(235, 229, 215, 0.56);
+  --muted-3: rgba(235, 229, 215, 0.68);
+  --muted-faint: rgba(235, 229, 215, 0.3);
+  --wash: rgba(229, 101, 63, 0.1);
+  --wash-strong: rgba(229, 101, 63, 0.15);
+
+  --sev-blunder: #ef6d48;
+  --sev-blunder-pale: rgba(239, 109, 72, 0.2);
+  --sev-mistake: #e08d64;
+  --sev-mistake-pale: rgba(224, 141, 100, 0.2);
+  --sev-inaccuracy: #d6b25a;
+  --sev-inaccuracy-pale: rgba(214, 178, 90, 0.18);
+  --sev-good: #c9c2b1;
+  --sev-good-pale: rgba(201, 194, 177, 0.12);
+  --sev-brilliant: #66bd90;
+  --sev-brilliant-pale: rgba(102, 189, 144, 0.2);
+
+  --board-light: #d9d1be;
+  --board-dark: #a7957a;
+  --board-best: #2f6b4f;
+  --mark: #68aec0;
+
+  --panel: #211f19;
+  --on-panel: #ebe5d7;
+  --panel-edge: rgba(235, 229, 215, 0.08);
+  --inverse: #3b382f;
+  --on-inverse: #f4efe3;
+  /* White on the brighter vermilion falls under 4.5:1; ink on it is 5.5:1. */
+  --on-vermilion: #16140f;
 }
 
 * {
@@ -92,33 +176,33 @@ a {
 /* ---------- typography primitives ---------- */
 
 .label {
-  font: 600 10px/1 var(--ui);
+  font: 600 calc(10px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .label-sm {
-  font: 600 9px/1 var(--ui);
+  font: 600 calc(9px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .meta {
-  font: 400 11px/1.6 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1.6 var(--ui);
   color: var(--muted-2);
 }
 
 .prose {
-  font: 400 13.5px/1.6 var(--prose);
+  font: 400 calc(13.5px * var(--text-scale))/1.6 var(--prose);
   color: var(--ink-3);
 }
 
 /* Coaching prose is the only serif body text, marking the generated layer as
    something to read rather than scan. */
 .coach-prose {
-  font: 400 15.5px/1.55 var(--prose);
+  font: 400 calc(15.5px * var(--text-scale))/1.55 var(--prose);
 }
 
 .numeric {
@@ -150,7 +234,7 @@ a {
 }
 
 .masthead-title {
-  font: 600 11px/1 var(--ui);
+  font: 600 calc(11px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--vermilion);
@@ -160,7 +244,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  font: 400 10.5px/1 var(--ui);
+  font: 400 calc(10.5px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -192,7 +276,7 @@ a {
 /* The headline is a sentence, not a hero — it states the product's claim against
    the left margin instead of a centred headline/subhead/CTA stack. */
 .headline {
-  font: 800 clamp(34px, 5.4vw, 76px) / 0.84 var(--display);
+  font: 800 calc(clamp(34px, 5.4vw, 76px) * var(--text-scale)) / 0.84 var(--display);
   letter-spacing: -0.025em;
   margin: 0;
   text-wrap: balance;
@@ -206,7 +290,7 @@ a {
 .headline-aside {
   border-left: 1px solid var(--rule);
   padding-left: 18px;
-  font: 400 12px/1.7 var(--ui);
+  font: 400 calc(12px * var(--text-scale))/1.7 var(--ui);
   color: var(--ink-2);
 }
 
@@ -221,7 +305,7 @@ a {
 }
 
 .band-label {
-  font: 600 10px/1 var(--ui);
+  font: 600 calc(10px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
@@ -235,7 +319,7 @@ a {
   border: 0;
   border-left: 1px solid var(--rule);
   padding: 13px 4px 11px;
-  font: 600 12px/1 var(--ui);
+  font: 600 calc(12px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   background: transparent;
@@ -249,8 +333,8 @@ a {
 }
 
 .band-option.is-active {
-  background: var(--ink);
-  color: var(--bone);
+  background: var(--inverse);
+  color: var(--on-inverse);
 }
 
 /* In the multi-select bands every option can be on at once, and an ink rule is
@@ -260,7 +344,7 @@ a {
 }
 
 .band-option:disabled {
-  color: rgba(20, 19, 15, 0.28);
+  color: var(--muted-faint);
   cursor: default;
 }
 
@@ -289,7 +373,7 @@ a {
   border: 0;
   border-left: 1px solid var(--rule);
   padding: 8px 12px;
-  font: 600 12px/1.3 var(--ui);
+  font: 600 calc(12px * var(--text-scale))/1.3 var(--ui);
   letter-spacing: 0.06em;
   color: var(--ink);
 }
@@ -304,7 +388,7 @@ a {
   border: 0;
   background: transparent;
   padding: 8px 0;
-  font: 600 10px/1 var(--ui);
+  font: 600 calc(10px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--vermilion);
@@ -356,13 +440,13 @@ a {
 /* Typography ranks the data: the worst number is read first without needing a
    "primary metric" label. */
 .stat-hero {
-  font: 800 clamp(48px, 7vw, 96px) / 0.8 var(--display);
+  font: 800 calc(clamp(48px, 7vw, 96px) * var(--text-scale)) / 0.8 var(--display);
   color: var(--vermilion);
   letter-spacing: -0.04em;
 }
 
 .stat-major {
-  font: 600 clamp(34px, 4vw, 54px) / 1 var(--display);
+  font: 600 calc(clamp(34px, 4vw, 54px) * var(--text-scale)) / 1 var(--display);
   letter-spacing: -0.02em;
 }
 
@@ -372,7 +456,7 @@ a {
 }
 
 .stat-note {
-  font: 400 11.5px/1.5 var(--ui);
+  font: 400 calc(11.5px * var(--text-scale))/1.5 var(--ui);
   color: var(--ink-2);
   margin-top: 8px;
 }
@@ -405,7 +489,7 @@ a {
   display: flex;
   justify-content: space-between;
   margin-top: 8px;
-  font: 400 11px/1.5 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1.5 var(--ui);
   color: var(--ink-2);
   gap: 8px;
 }
@@ -510,12 +594,12 @@ a {
 
 /* Chess already has an icon set — the glyphs carry severity at display size. */
 .glyph {
-  font: 400 44px/0.8 var(--display);
+  font: 400 calc(44px * var(--text-scale))/0.8 var(--display);
   color: var(--vermilion);
 }
 
 .glyph-sm {
-  font: 600 16px/1 var(--display);
+  font: 600 calc(16px * var(--text-scale))/1 var(--display);
 }
 
 .glyph-blunder {
@@ -549,7 +633,7 @@ a {
   gap: 6px;
   padding: 3px 9px 4px;
   border-radius: 2px;
-  font: 600 12px/1.1 var(--ui);
+  font: 600 calc(12px * var(--text-scale))/1.1 var(--ui);
   letter-spacing: 0.02em;
   white-space: nowrap;
   color: var(--sev-good);
@@ -557,7 +641,7 @@ a {
 }
 
 .verdict-glyph {
-  font: 600 13px/1 var(--display);
+  font: 600 calc(13px * var(--text-scale))/1 var(--display);
   opacity: 0.85;
 }
 
@@ -582,7 +666,7 @@ a {
 }
 
 .pattern-title {
-  font: 600 21px/1.25 var(--display);
+  font: 600 calc(21px * var(--text-scale))/1.25 var(--display);
 }
 
 /* Title and verdict share a baseline and wrap together on a narrow screen, so the
@@ -590,7 +674,7 @@ a {
 /* The move-list filters name the verdict they select and carry its colour, so the
    row of tabs reads as a severity scale rather than four kinds of punctuation. */
 .filter-name {
-  font: 600 9.5px/1.1 var(--ui);
+  font: 600 calc(9.5px * var(--text-scale))/1.1 var(--ui);
   letter-spacing: 0.04em;
   white-space: nowrap;
   max-width: 100%;
@@ -603,13 +687,13 @@ a {
    screens that narrow rather than thinned across every phone to rescue the rarest. */
 @media (max-width: 350px) {
   .filter-name {
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     letter-spacing: 0.01em;
   }
 }
 
 .filter-glyph {
-  font: 600 12px/1 var(--display);
+  font: 600 calc(12px * var(--text-scale))/1 var(--display);
   opacity: 0.8;
 }
 
@@ -634,14 +718,14 @@ a {
 }
 
 .pattern-meta {
-  font: 400 11px/1 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1 var(--ui);
   color: var(--muted-2);
   margin-top: 10px;
 }
 
 .pattern-cost {
   text-align: right;
-  font: 400 11px/1.6 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1.6 var(--ui);
   color: var(--ink-2);
 }
 
@@ -652,8 +736,9 @@ a {
 /* ---------- ink panel ---------- */
 
 .ink-panel {
-  background: var(--ink);
-  color: var(--bone);
+  background: var(--panel);
+  color: var(--on-panel);
+  box-shadow: inset 0 0 0 1px var(--panel-edge);
   padding: 24px 24px 26px;
   align-self: start;
 }
@@ -671,7 +756,7 @@ a {
   grid-template-columns: 62px 1fr 34px;
   gap: 10px;
   align-items: center;
-  font: 400 11px/1 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1 var(--ui);
   color: rgba(232, 226, 212, 0.6);
 }
 
@@ -699,9 +784,9 @@ a {
 .btn {
   border: 0;
   background: var(--vermilion);
-  color: #fff;
+  color: var(--on-vermilion);
   padding: 13px 22px;
-  font: 600 10.5px/1 var(--ui);
+  font: 600 calc(10.5px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -722,6 +807,12 @@ a {
   border: 1px solid var(--rule);
 }
 
+.btn-ghost:disabled {
+  background: transparent;
+  color: var(--muted-faint);
+  border-color: var(--rule-faint);
+}
+
 .btn-ghost:hover:not(:disabled) {
   background: transparent;
   border-color: var(--ink);
@@ -729,13 +820,13 @@ a {
 
 .btn-on-ink {
   background: transparent;
-  color: var(--bone);
+  color: var(--on-panel);
   border: 1px solid rgba(232, 226, 212, 0.4);
 }
 
 .btn-on-ink:hover:not(:disabled) {
   background: transparent;
-  border-color: var(--bone);
+  border-color: var(--on-panel);
 }
 
 .field {
@@ -743,7 +834,7 @@ a {
 }
 
 .field-label {
-  font: 600 10px/1 var(--ui);
+  font: 600 calc(10px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
@@ -759,7 +850,7 @@ a {
   border: 1px solid var(--rule);
   padding: 13px 14px;
   /* A pasted PGN is notation, not prose — it wants the fixed width. */
-  font: 400 14px/1.4 var(--mono);
+  font: 400 calc(14px * var(--text-scale))/1.4 var(--mono);
   color: var(--ink);
 }
 
@@ -778,12 +869,12 @@ a {
 .textarea {
   min-height: 190px;
   resize: vertical;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-scale));
   line-height: 1.6;
 }
 
 .input-hero {
-  font: 600 clamp(22px, 3vw, 34px) / 1.1 var(--display);
+  font: 600 calc(clamp(22px, 3vw, 34px) * var(--text-scale)) / 1.1 var(--display);
   padding: 14px 0;
   background: transparent;
   border: 0;
@@ -791,7 +882,7 @@ a {
 }
 
 .input-hero::placeholder {
-  color: rgba(20, 19, 15, 0.28);
+  color: var(--muted-faint);
 }
 
 /* ---------- table ---------- */
@@ -843,11 +934,11 @@ a {
 }
 
 .game-accuracy {
-  font: 600 17px/1 var(--display);
+  font: 600 calc(17px * var(--text-scale))/1 var(--display);
 }
 
 .game-result {
-  font: 600 12px/1 var(--mono);
+  font: 600 calc(12px * var(--text-scale))/1 var(--mono);
 }
 
 @media (max-width: 720px) {
@@ -909,8 +1000,8 @@ a {
 }
 
 .row.opening-row.is-active {
-  background: var(--ink);
-  color: var(--bone);
+  background: var(--inverse);
+  color: var(--on-inverse);
 }
 
 .row.opening-row.is-active .meta,
@@ -932,7 +1023,7 @@ a {
 }
 
 .result-win {
-  color: #2f6b4f;
+  color: var(--sev-brilliant);
   font-weight: 600;
 }
 
@@ -991,7 +1082,7 @@ a {
 }
 
 .square-best-from {
-  box-shadow: inset 0 0 0 3px #2f6b4f;
+  box-shadow: inset 0 0 0 3px var(--board-best);
 }
 
 /* Unicode figurines, not sprites — the pieces are type, so they scale with the
@@ -1008,7 +1099,7 @@ a {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  color: var(--ink);
+  color: var(--piece-black);
   /* Clicks belong to the square underneath, so right-click markup works wherever
      you aim it rather than only on the empty squares. */
   pointer-events: none;
@@ -1038,7 +1129,7 @@ a {
 
 .piece-white {
   color: var(--piece-white);
-  -webkit-text-stroke: 1.5px var(--ink);
+  -webkit-text-stroke: 1.5px var(--piece-black);
   paint-order: stroke fill;
 }
 
@@ -1046,10 +1137,10 @@ a {
   position: absolute;
   left: 0;
   bottom: 0;
-  background: var(--ink);
-  color: var(--bone);
+  background: var(--panel);
+  color: var(--on-panel);
   padding: 7px 11px;
-  font: 600 12px/1 var(--ui);
+  font: 600 calc(12px * var(--text-scale))/1 var(--ui);
 }
 
 /* ---------- eval strip ---------- */
@@ -1057,7 +1148,7 @@ a {
 .eval-strip {
   border-right: 1px solid var(--rule);
   position: relative;
-  background: var(--ink);
+  background: var(--piece-black);
 }
 
 .eval-strip-white {
@@ -1066,7 +1157,7 @@ a {
   right: 0;
   top: 0;
   height: var(--eval-share, 50%);
-  background: var(--paper);
+  background: var(--piece-white);
 }
 
 .eval-strip-marker {
@@ -1101,7 +1192,7 @@ a {
   display: flex;
   align-items: center;
   gap: 6px;
-  font: 400 11px/1 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.04em;
   color: var(--muted-3);
 }
@@ -1128,7 +1219,7 @@ a {
 /* Whichever side the player had, their share fills up from the floor — so the
    background is always the opponent's colour and the area is always the player's. */
 .evalgraph-plot.is-you-white {
-  background: var(--ink);
+  background: var(--piece-black);
 }
 
 .evalgraph-plot.is-you-white .evalgraph-area {
@@ -1140,7 +1231,7 @@ a {
 }
 
 .evalgraph-plot.is-you-black .evalgraph-area {
-  fill: var(--ink);
+  fill: var(--piece-black);
 }
 
 /* Both of these cross from ink into bone, so they are a mid tone that holds against
@@ -1213,14 +1304,134 @@ a {
   justify-content: space-between;
   gap: 8px 12px;
   margin-top: 14px;
-  font: 400 11px/1.4 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1.4 var(--ui);
   color: rgba(232, 226, 212, 0.55);
 }
 
 .coach-error {
   margin-top: 10px;
-  font: 400 12px/1.5 var(--ui);
+  font: 400 calc(12px * var(--text-scale))/1.5 var(--ui);
   color: var(--vermilion-pale);
+}
+
+/* ---------- appearance ----------
+   Theme and text size reuse the time-class band, so a setting looks like every
+   other choice on the sheet. The typefaces are cards that show themselves: each
+   sample is set in the face it offers, at roughly the size it is used. */
+
+.appearance {
+  padding-bottom: 8px;
+}
+
+.appearance-band {
+  margin-top: 0;
+}
+
+.appearance-band + .appearance-band {
+  border-top-width: 1px;
+}
+
+/* One label width for both rows, so their options line up in columns. */
+.appearance-band .band-label {
+  width: 92px;
+}
+
+.appearance-fonts {
+  margin: 0 var(--margin);
+  padding: 22px 0 44px;
+}
+
+.font-role + .font-role {
+  margin-top: 26px;
+}
+
+.font-role-label {
+  margin-bottom: 10px;
+}
+
+.font-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.font-option {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  padding: 13px 14px 12px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.font-option:hover:not(.is-active) {
+  border-color: var(--ink);
+}
+
+/* Outlined rather than filled: a sample has to be judged in the page's own
+   colours, and inverting the card would show the face as it never appears. */
+.font-option.is-active {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.font-option-sample {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.font-sample-display {
+  font-size: calc(30px * var(--text-scale));
+  font-weight: 600;
+  line-height: 1;
+}
+
+.font-sample-ui {
+  font-size: calc(13px * var(--text-scale));
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.font-sample-prose {
+  font-size: calc(15px * var(--text-scale));
+  line-height: 1.45;
+}
+
+.font-sample-mono {
+  font-size: calc(14px * var(--text-scale));
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.font-option-name {
+  font: 600 calc(11px * var(--text-scale))/1.2 var(--ui);
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+
+.font-option-tick {
+  color: var(--vermilion);
+}
+
+.font-option-note {
+  font: 400 calc(11px * var(--text-scale))/1.35 var(--ui);
+  color: var(--muted-2);
+}
+
+.appearance-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 24px;
 }
 
 /* ---------- claude's reading ----------
@@ -1241,7 +1452,7 @@ a {
 }
 
 .reading-by {
-  font: 400 11px/1.3 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1.3 var(--ui);
   color: var(--muted-3);
 }
 
@@ -1252,14 +1463,14 @@ a {
 .reading-note {
   margin: 10px 0 0;
   max-width: 70ch;
-  font: 400 13.5px/1.55 var(--prose);
+  font: 400 calc(13.5px * var(--text-scale))/1.55 var(--prose);
   color: var(--ink-3);
 }
 
 .reading-error {
   margin-top: 10px;
   max-width: 80ch;
-  font: 400 12.5px/1.5 var(--ui);
+  font: 400 calc(12.5px * var(--text-scale))/1.5 var(--ui);
   color: var(--vermilion-dark);
 }
 
@@ -1298,17 +1509,17 @@ a {
 }
 
 .reading-point.is-current {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--bone);
+  background: var(--inverse);
+  border-color: var(--inverse);
+  color: var(--on-inverse);
 }
 
 .reading-move {
-  font: 600 12px/1 var(--mono);
+  font: 600 calc(12px * var(--text-scale))/1 var(--mono);
 }
 
 .reading-title {
-  font: 400 12.5px/1.3 var(--ui);
+  font: 400 calc(12.5px * var(--text-scale))/1.3 var(--ui);
 }
 
 .reading-lesson {
@@ -1320,12 +1531,12 @@ a {
 }
 
 .reading-lesson .coach-prose {
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale));
 }
 
 .reading-recurring {
   margin: 8px 0 0;
-  font: 400 12.5px/1.5 var(--ui);
+  font: 400 calc(12.5px * var(--text-scale))/1.5 var(--ui);
   color: var(--muted-3);
 }
 
@@ -1388,7 +1599,7 @@ a {
   border: 0;
   border-left: 1px solid var(--rule);
   padding: 10px 3px;
-  font: 600 11px/1 var(--ui);
+  font: 600 calc(11px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   background: transparent;
@@ -1407,8 +1618,8 @@ a {
 }
 
 .move-filter.is-active {
-  background: var(--ink);
-  color: var(--bone);
+  background: var(--inverse);
+  color: var(--on-inverse);
 }
 
 .move-filter:hover:not(.is-active) {
@@ -1433,8 +1644,8 @@ a {
 }
 
 .move-row.is-current {
-  background: var(--ink);
-  color: var(--bone);
+  background: var(--inverse);
+  color: var(--on-inverse);
 }
 
 .move-row.is-current .move-num {
@@ -1442,16 +1653,16 @@ a {
 }
 
 .move-num {
-  font: 400 11px/1 var(--mono);
-  color: rgba(20, 19, 15, 0.42);
+  font: 400 calc(11px * var(--text-scale))/1 var(--mono);
+  color: var(--muted);
 }
 
 .move-san {
-  font: 500 13.5px/1.3 var(--mono);
+  font: 500 calc(13.5px * var(--text-scale))/1.3 var(--mono);
 }
 
 .move-cp {
-  font: 400 11px/1 var(--mono);
+  font: 400 calc(11px * var(--text-scale))/1 var(--mono);
   text-align: right;
 }
 
@@ -1465,7 +1676,7 @@ a {
 }
 
 .empty h2 {
-  font: 600 28px/1.2 var(--display);
+  font: 600 calc(28px * var(--text-scale))/1.2 var(--display);
   margin: 0 0 12px;
 }
 
@@ -1473,7 +1684,7 @@ a {
   border-left: 3px solid var(--vermilion);
   padding: 12px 16px;
   background: var(--wash);
-  font: 400 12px/1.6 var(--ui);
+  font: 400 calc(12px * var(--text-scale))/1.6 var(--ui);
   color: var(--ink-3);
 }
 
@@ -1546,7 +1757,7 @@ a {
 }
 
 .scout-heading {
-  font: 600 11px/1 var(--ui);
+  font: 600 calc(11px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   padding-bottom: 12px;
@@ -1564,7 +1775,7 @@ a {
 }
 
 .trait-title {
-  font: 600 17px/1.25 var(--display);
+  font: 600 calc(17px * var(--text-scale))/1.25 var(--display);
 }
 
 .trait-detail {
@@ -1574,7 +1785,7 @@ a {
 
 .trait-evidence {
   margin-top: 8px;
-  font: 400 11px/1.5 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1.5 var(--ui);
   color: var(--muted);
 }
 
@@ -1618,7 +1829,7 @@ a {
   align-items: baseline;
   gap: 9px;
   padding: 9px 2px;
-  font: 400 13px/1 var(--ui);
+  font: 400 calc(13px * var(--text-scale))/1 var(--ui);
   color: var(--ink-3);
   border-bottom: 1px solid var(--rule);
 }
@@ -1649,7 +1860,7 @@ a {
 }
 
 .player-disc-black {
-  background: var(--ink);
+  background: var(--piece-black);
 }
 
 .player-name {
@@ -1663,7 +1874,7 @@ a {
 }
 
 .player-you {
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--vermilion);
@@ -1681,7 +1892,7 @@ a {
 }
 
 .btn-sm {
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   padding: 7px 11px;
   text-decoration: none;
 }
@@ -1691,7 +1902,7 @@ a {
 .lesson-link {
   display: inline-block;
   margin-top: 14px;
-  font: 600 11px/1 var(--ui);
+  font: 600 calc(11px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--vermilion-pale);
@@ -1751,10 +1962,10 @@ a {
 /* Sits under the masthead title in a read-only sheet. Quiet, but never absent: the
    whole risk of a snapshot is reading last month's form as today's. */
 .masthead-provenance {
-  font: 400 11px/1.5 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1.5 var(--ui);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(20, 19, 15, 0.45);
+  color: var(--muted);
   margin-top: 7px;
 }
 
@@ -1767,10 +1978,10 @@ a {
 }
 
 .snapshot-facts dt {
-  font: 400 11px/1 var(--ui);
+  font: 400 calc(11px * var(--text-scale))/1 var(--ui);
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(20, 19, 15, 0.5);
+  color: var(--muted-2);
   padding: 13px 0;
   border-top: 1px solid var(--rule);
 }
@@ -1779,7 +1990,7 @@ a {
   margin: 0;
   padding: 13px 0;
   border-top: 1px solid var(--rule);
-  font: 400 15px/1.4 var(--body);
+  font: 400 calc(15px * var(--text-scale))/1.4 var(--body);
 }
 
 /* Everything in the snapshot panel shares the section gutter. */
@@ -1937,11 +2148,11 @@ a {
   }
 
   .glyph {
-    font-size: 34px;
+    font-size: calc(34px * var(--text-scale));
   }
 
   .pattern-title {
-    font-size: 17px;
+    font-size: calc(17px * var(--text-scale));
   }
 
   .pattern-cost {
@@ -2003,7 +2214,7 @@ a {
 }
 
 .import-warning-time {
-  font: 600 17px/1.2 var(--display);
+  font: 600 calc(17px * var(--text-scale))/1.2 var(--display);
   margin-bottom: 8px;
 }
 
@@ -2018,7 +2229,7 @@ a {
 }
 
 .pgn-file-name {
-  font: 400 12px/1.3 var(--mono);
+  font: 400 calc(12px * var(--text-scale))/1.3 var(--mono);
   color: var(--muted);
   display: flex;
   align-items: center;

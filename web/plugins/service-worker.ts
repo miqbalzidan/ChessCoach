@@ -44,6 +44,11 @@ export function serviceWorker(): Plugin {
       const precache = filesIn(root)
         // Source maps are for whoever is debugging, not for a phone on a train.
         .filter((file) => !file.endsWith('.map'))
+        // The typefaces you can switch to in Settings: nearly 600 KB that most installs
+        // never use. Left to the fetch handler below, which caches whatever the page
+        // asks for — so a face is fetched once, the first time it is chosen, and is
+        // there offline from then on.
+        .filter((file) => !file.startsWith('fonts/extra/'))
         .map((file) => `${base}${file}`)
         // The app is entered by its root, which is not a file in the build output.
         .concat(base);
