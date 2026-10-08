@@ -160,6 +160,19 @@ export function migrate(db: DB): void {
   if (coachingColumns.some((column) => column.name === 'scope')) {
     db.exec('ALTER TABLE coaching RENAME COLUMN scope TO lens');
   }
+
+  // Undoes what "analyse this game" did to a game that had no moves to analyse: it
+  // was saved as analysed, at 100% for both sides, with nothing behind the number.
+  // A real game always has moves, so an analysed game without any can only be that,
+  // and it goes back to waiting for analysis. On a phone this is what clears the
+  // fake games out of the sheet the next time the app opens.
+  db.exec(`
+    UPDATE games
+       SET analysed_at = NULL, analysis_depth = NULL, engine = NULL,
+           accuracy_white = NULL, accuracy_black = NULL
+     WHERE analysed_at IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM moves WHERE moves.game_id = games.id)
+  `);
 }
 
 export function getSetting(db: DB, key: string, fallback: string): string {

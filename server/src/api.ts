@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import type { DB } from './db-node.js';
 import { getSetting, setSetting } from './db-node.js';
 import type { EnginePool } from './engine-node.js';
-import { analyseGame } from '../../core/src/analysis.js';
+import { analyseGame, NoMovesToAnalyse } from '../../core/src/analysis.js';
 import { buildSnapshot } from '../../web/src/snapshot-build.js';
 import {
   createJob,
@@ -228,7 +228,7 @@ export function createApi(db: DB, pool: EnginePool): Router {
       const refreshed = getGame(db, game.id)!;
       res.json({ game: refreshed, moves: getMoves(db, game.id) });
     } catch (error) {
-      res.status(500).json({ error: messageOf(error) });
+      res.status(error instanceof NoMovesToAnalyse ? 409 : 500).json({ error: messageOf(error) });
     }
   });
 
