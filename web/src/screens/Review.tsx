@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { inSnapshotMode } from '../snapshot';
 import { inLocalMode } from '../engine/local';
+import { describeJob, isActive, useJobs } from '../jobs';
 import { Board } from '../components/Board';
 import { EvalGraph } from '../components/EvalGraph';
 import { GameReading } from '../components/GameReading';
@@ -101,6 +102,40 @@ export function Review() {
       cancelled = true;
     };
   }, [id]);
+
+  // A background job may analyse this very game while it sits here unanalysed; when it
+  // has, show it, rather than a button for work that is already done.
+  const { job, revision } = useJobs();
+  const unanalysed = game !== null && !game.analysed_at;
+  useEffect(() => {
+    if (!id || !unanalysed || revision === 0) return;
+    let cancelled = false;
+    api
+      .game(Number(id))
+      .then((response) => {
+        if (cancelled || !response.game.analysed_at) return;
+        setGame(response.game);
+        setMoves(response.moves);
+        const firstBlunder = response.moves.find(
+          (move) => move.is_player === 1 && move.classification === 'blunder',
+        );
+        setPly(firstBlunder?.ply ?? 0);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [id, unanalysed, revision]);
+
+  // Seconds on the clock while one game is analysed, so a long wait reads as working.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!analysing) return;
+    setElapsed(0);
+    const started = Date.now();
+    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 500);
+    return () => window.clearInterval(timer);
+  }, [analysing]);
 
   const current = ply > 0 ? moves[ply - 1] : null;
   const playerColor = game?.player_color ?? 'white';
@@ -280,8 +315,14 @@ export function Review() {
         ) : (
           <>
             <button type="button" className="btn" onClick={runAnalysis} disabled={analysing}>
-              {analysing ? 'analysing…' : 'analyse this game'}
+              {analysing ? `analysing… ${elapsed}s` : 'analyse this game'}
             </button>
+            {analysing && isActive(job) ? (
+              <div className="meta" style={{ marginTop: 12 }}>
+                Sharing the engine with the background job ({describeJob(job).toLowerCase()}), so
+                this may take longer than usual.
+              </div>
+            ) : null}
             {analyseError ? (
               <div className="prose" style={{ marginTop: 16, color: 'var(--vermilion-dark)' }}>
                 {analyseError}

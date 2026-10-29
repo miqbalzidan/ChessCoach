@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useJobs } from '../jobs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { Board } from '../components/Board';
@@ -46,11 +47,16 @@ export function Patterns({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { revision } = useJobs();
+  const seenRevision = useRef(revision);
 
   useEffect(() => {
     if (!username) return;
     let cancelled = false;
-    setLoading(true);
+    // A job finishing more games refreshes what is shown without blanking it.
+    const quiet = seenRevision.current !== revision;
+    seenRevision.current = revision;
+    if (!quiet) setLoading(true);
 
     Promise.all([api.patterns(username, lens), api.dashboard(username, lens)])
       .then(([patternResponse, dashboard]) => {
@@ -72,7 +78,7 @@ export function Patterns({
     };
     // The lens is an object rebuilt on every render, so the key is the dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [username, lensKey(lens)]);
+  }, [username, lensKey(lens), revision]);
 
   useEffect(() => {
     if (!username) return;

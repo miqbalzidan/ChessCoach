@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useJobs } from '../jobs';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { inSnapshotMode } from '../snapshot';
@@ -51,11 +52,16 @@ export function Dashboard({
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { revision } = useJobs();
+  const seenRevision = useRef(revision);
 
   useEffect(() => {
     if (!username) return;
     let cancelled = false;
-    setLoading(true);
+    // A job finishing more games refreshes what is shown without blanking it.
+    const quiet = seenRevision.current !== revision;
+    seenRevision.current = revision;
+    if (!quiet) setLoading(true);
     setError(null);
 
     Promise.all([
@@ -81,7 +87,7 @@ export function Dashboard({
     };
     // The lens is an object rebuilt on every render, so the key is the dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [username, lensKey(lens)]);
+  }, [username, lensKey(lens), revision]);
 
   // Coaching is a separate request because it can be slow and the numbers should
   // never wait on it.

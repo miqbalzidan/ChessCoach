@@ -1,15 +1,16 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import type { Lens, OpeningRow, Scope, TimeClassSummary } from '../types';
 import { TIME_CLASSES } from '../types';
 import { activeSnapshot } from '../snapshot';
 import { pluralise, relativeTime } from '../format';
+import { describeJob, isActive, jobFraction, useJobs } from '../jobs';
 
 const SECTIONS = [
-  { to: '/', label: '01 sheet', end: true },
-  { to: '/library', label: '02 library', end: false },
-  { to: '/patterns', label: '04 patterns', end: false },
-  { to: '/import', label: '05 import', end: false },
-  { to: '/settings', label: '06 settings', end: false },
+  { to: '/', label: 'Sheet', end: true },
+  { to: '/library', label: 'Library', end: false },
+  { to: '/patterns', label: 'Patterns', end: false },
+  { to: '/import', label: 'Import', end: false },
+  { to: '/settings', label: 'Settings', end: false },
 ];
 
 export function Masthead({ username }: { username: string | null }) {
@@ -19,19 +20,25 @@ export function Masthead({ username }: { username: string | null }) {
 
   return (
     <header className="masthead">
-      <div>
-        <div className="masthead-title">Leak sheet{username ? ` — ${username}` : ''}</div>
-        {snapshot && (
-          /* A snapshot is a photograph, and an undated photograph of your chess is
-             worse than none — it reads as today's form when it may be a month old. */
-          <div className="masthead-provenance">
-            snapshot · {pluralise(snapshot.games.length, 'game')} · taken{' '}
-            {relativeTime(snapshot.generatedAt)} · {snapshot.engine} depth{' '}
-            {snapshot.analysisDepth}
+      <div className="masthead-top">
+        <div>
+          <div className="masthead-title">
+            Leak sheet
+            {username ? <span className="masthead-player">{username}</span> : null}
           </div>
-        )}
+          {snapshot && (
+            /* A snapshot is a photograph, and an undated photograph of your chess is
+               worse than none — it reads as today's form when it may be a month old. */
+            <div className="masthead-provenance">
+              snapshot · {pluralise(snapshot.games.length, 'game')} · taken{' '}
+              {relativeTime(snapshot.generatedAt)} · {snapshot.engine} depth{' '}
+              {snapshot.analysisDepth}
+            </div>
+          )}
+        </div>
+        <JobStatus />
       </div>
-      <nav className="masthead-nav">
+      <nav className="masthead-nav" aria-label="Sections">
         {sections.map((section) => (
           <NavLink
             key={section.to}
@@ -44,6 +51,38 @@ export function Masthead({ username }: { username: string | null }) {
         ))}
       </nav>
     </header>
+  );
+}
+
+/** The background job, wherever you are in the app. Links to where it was started. */
+export function JobStatus() {
+  const { job } = useJobs();
+  if (!job) return null;
+  const active = isActive(job);
+  const fraction = jobFraction(job);
+
+  return (
+    <Link
+      to="/settings"
+      className={`job-status${active ? '' : job.status === 'error' ? ' is-error' : ' is-done'}`}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="job-status-text">
+        {active ? <span className="spinner-dot" /> : null}
+        {describeJob(job)}
+      </span>
+      <JobBar fraction={fraction} />
+    </Link>
+  );
+}
+
+/** A thin determinate bar, or an indeterminate one while there is nothing to count. */
+export function JobBar({ fraction }: { fraction: number | null }) {
+  return (
+    <span className={`job-bar${fraction === null ? ' is-indeterminate' : ''}`} aria-hidden="true">
+      <span style={fraction === null ? undefined : { width: `${fraction * 100}%` }} />
+    </span>
   );
 }
 

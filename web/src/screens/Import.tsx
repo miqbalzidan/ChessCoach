@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { estimateImport, inLocalMode, storageIsPersistent } from '../engine/local';
 import { pluralise } from '../format';
+import { useJobs } from '../jobs';
 import { splitPgns } from '../../../core/src/importer';
 import { TIME_CLASSES, type Job, type TimeClass } from '../types';
 
@@ -23,6 +24,7 @@ export function Import({ onImported }: { onImported: (username: string) => void 
   const [limit, setLimit] = useState(50);
   const [timeClasses, setTimeClasses] = useState<TimeClass[]>([...TIME_CLASSES]);
   const [job, setJob] = useState<Job | null>(null);
+  const { track } = useJobs();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [estimate, setEstimate] = useState<{ games: number; seconds: number } | null>(null);
@@ -112,6 +114,8 @@ export function Import({ onImported }: { onImported: (username: string) => void 
           : await api.importPgn({ username: username.trim(), pgn: pgnText });
       const created = await api.job(response.jobId);
       setJob(created.job);
+      // So the masthead keeps showing it after you leave this screen.
+      void track(response.jobId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Import failed to start');
     } finally {

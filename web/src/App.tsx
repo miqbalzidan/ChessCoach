@@ -9,6 +9,7 @@ import { Patterns } from './screens/Patterns';
 import { Review } from './screens/Review';
 import { Settings } from './screens/Settings';
 import { inSnapshotMode } from './snapshot';
+import { JobProvider } from './jobs';
 import type { Lens, Scope } from './types';
 
 const ACTIVE_PLAYER_KEY = 'chesscoach.player';
@@ -84,67 +85,69 @@ export function App() {
   );
 
   return (
-    <div className="sheet">
-      <Masthead username={username} />
-      <Routes>
-        <Route
-          path="/"
-          element={
-            checked && !username && !snapshot ? (
-              <Navigate to="/import" replace />
-            ) : (
-              <Dashboard
+    <JobProvider username={username} onSettled={refreshPlayers}>
+      <div className="sheet">
+        <Masthead username={username} />
+        <Routes>
+          <Route
+            path="/"
+            element={
+              checked && !username && !snapshot ? (
+                <Navigate to="/import" replace />
+              ) : (
+                <Dashboard
+                  username={username}
+                  lens={lens}
+                  onScopeChange={changeScope}
+                  onLensChange={changeLens}
+                  engine={engine}
+                />
+              )
+            }
+          />
+          <Route
+            path="/library"
+            element={
+              <Library
                 username={username}
                 lens={lens}
                 onScopeChange={changeScope}
                 onLensChange={changeLens}
-                engine={engine}
               />
-            )
-          }
-        />
-        <Route
-          path="/library"
-          element={
-            <Library
-              username={username}
-              lens={lens}
-              onScopeChange={changeScope}
-              onLensChange={changeLens}
-            />
-          }
-        />
-        <Route path="/review/:id" element={<Review />} />
-        <Route
-          path="/patterns"
-          element={
-            <Patterns
-              username={username}
-              lens={lens}
-              onScopeChange={changeScope}
-              onLensChange={changeLens}
-            />
-          }
-        />
-        <Route
-          path="/import"
-          element={snapshot ? <Navigate to="/" replace /> : <Import onImported={onImported} />}
-        />
-        <Route
-          path="/settings"
-          element={
-            <Settings
-              activeUsername={username}
-              onSelect={(next) => {
-                selectPlayer(next);
-                navigate('/');
-              }}
-              onChanged={refreshPlayers}
-            />
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </div>
+            }
+          />
+          <Route path="/review/:id" element={<Review />} />
+          <Route
+            path="/patterns"
+            element={
+              <Patterns
+                username={username}
+                lens={lens}
+                onScopeChange={changeScope}
+                onLensChange={changeLens}
+              />
+            }
+          />
+          <Route
+            path="/import"
+            element={snapshot ? <Navigate to="/" replace /> : <Import onImported={onImported} />}
+          />
+          <Route
+            path="/settings"
+            element={
+              <Settings
+                activeUsername={username}
+                onSelect={(next) => {
+                  selectPlayer(next);
+                  navigate('/');
+                }}
+                onChanged={refreshPlayers}
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </JobProvider>
   );
 }
