@@ -34,7 +34,7 @@ import {
   upsertPlayer,
 } from '../../../core/src/store.js';
 import {
-  analysePending,
+  analysePendingJob,
   createJob,
   getJob,
   latestJob,
@@ -287,13 +287,7 @@ async function route(request: WorkerRequest): Promise<unknown> {
 
     if (tail === 'analyse-pending' && method === 'POST') {
       const job = createJob(handle, player.username);
-      void analysePending(handle, await engines(), job.id, player.id, depthSetting(handle)).then(
-        () => {
-          handle
-            .prepare("UPDATE import_jobs SET status = 'done', stage = 'done' WHERE id = ?")
-            .run(job.id);
-        },
-      );
+      void analysePendingJob(handle, await engines(), job.id, player.id, depthSetting(handle));
       return { jobId: job.id };
     }
 

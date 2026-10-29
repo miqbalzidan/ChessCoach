@@ -121,7 +121,7 @@ export async function analysePending(
   depth?: number,
 ): Promise<void> {
   const pending = unanalysedGames(db, playerId, 1000);
-  updateJob(db, jobId, { stage: 'analysing', total: pending.length, analysed: 0 });
+  updateJob(db, jobId, { status: 'running', stage: 'analysing', total: pending.length, analysed: 0 });
 
   let analysed = 0;
   let withoutMoves = 0;
@@ -150,6 +150,27 @@ export async function analysePending(
         `${withoutMoves} ${withoutMoves === 1 ? 'game' : 'games'} came from the computer without ` +
         'their moves, so they cannot be analysed here. Analyse them on the computer, then export again.',
     });
+  }
+}
+
+/**
+ * "Analyse pending" as a job of its own, not the tail of an import: it owns the
+ * job's ending as well, so a failure part-way reads as an error instead of a job
+ * that stays running for ever.
+ */
+export async function analysePendingJob(
+  db: DB,
+  pool: EnginePool,
+  jobId: number,
+  playerId: number,
+  depth?: number,
+): Promise<void> {
+  try {
+    await analysePending(db, pool, jobId, playerId, depth);
+    updateJob(db, jobId, { status: 'done', stage: 'done' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Analysis failed';
+    updateJob(db, jobId, { status: 'error', stage: 'error', message });
   }
 }
 

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useJobs } from '../jobs';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { Empty, ErrorNote, Loading, OpeningBand } from '../components/Chrome';
@@ -25,11 +26,16 @@ export function Library({
   const [opponent, setOpponent] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { revision } = useJobs();
+  const seenRevision = useRef(revision);
 
   useEffect(() => {
     if (!username) return;
     let cancelled = false;
-    setLoading(true);
+    // A job finishing more games refreshes what is shown without blanking it.
+    const quiet = seenRevision.current !== revision;
+    seenRevision.current = revision;
+    if (!quiet) setLoading(true);
 
     // Debounced so typing an opponent name does not fire a request per keystroke.
     const timer = setTimeout(() => {
@@ -62,7 +68,7 @@ export function Library({
     };
     // The lens is an object rebuilt on every render, so the key is the dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [username, lensKey(lens), result, opponent]);
+  }, [username, lensKey(lens), result, opponent, revision]);
 
   // The opening menu belongs to the time class, not to the filtered list, so it is
   // fetched on its own and survives a filter that matches nothing.

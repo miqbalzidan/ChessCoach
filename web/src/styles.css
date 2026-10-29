@@ -225,35 +225,65 @@ a {
     env(safe-area-inset-left);
 }
 
+/* The masthead is two lines: the sheet's name and anything running in the
+   background, then the sections as a ruled tab row along the left margin — where
+   the eye starts reading, rather than tucked into the top-right corner. */
 .masthead {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: start;
-  gap: 30px;
-  padding: 26px var(--margin) 0;
+  padding: 22px var(--margin) 0;
+}
+
+.masthead-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 28px;
 }
 
 .masthead-title {
-  font: 600 calc(11px * var(--text-scale))/1 var(--ui);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font: 600 calc(11px * var(--text-scale))/1.4 var(--ui);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--vermilion);
 }
 
+.masthead-player {
+  font: 600 calc(15px * var(--text-scale))/1.2 var(--display);
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--ink);
+}
+
 .masthead-nav {
   display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  font: 400 calc(10.5px * var(--text-scale))/1 var(--ui);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  gap: 28px;
+  margin-top: 16px;
+  border-bottom: 1px solid var(--rule);
+  font: 500 calc(13.5px * var(--text-scale))/1 var(--ui);
+  letter-spacing: 0.02em;
+  /* Five sections fit a phone only just; scrolling sideways beats wrapping to a
+     second row of tabs. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.masthead-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .masthead-nav a {
-  color: var(--muted);
+  flex: none;
+  color: var(--muted-3);
   text-decoration: none;
-  padding-bottom: 3px;
+  padding: 10px 0 11px;
+  /* Sits on the rule below rather than under it. */
+  margin-bottom: -1px;
   border-bottom: 2px solid transparent;
+  transition: color 120ms ease, border-color 120ms ease;
 }
 
 .masthead-nav a:hover {
@@ -262,7 +292,89 @@ a {
 
 .masthead-nav a.active {
   color: var(--ink);
+  font-weight: 600;
   border-bottom-color: var(--vermilion);
+}
+
+.masthead-nav a:focus-visible {
+  outline: 2px solid var(--vermilion);
+  outline-offset: 2px;
+}
+
+/* The background job, in the masthead's top-right corner. */
+.job-status {
+  display: grid;
+  gap: 6px;
+  width: min(260px, 50vw);
+  text-decoration: none;
+  color: var(--ink-2);
+}
+
+.job-status-text {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font: 500 calc(11.5px * var(--text-scale))/1.3 var(--ui);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.job-status.is-done .job-status-text {
+  color: var(--sev-brilliant);
+}
+
+.job-status.is-error .job-status-text {
+  color: var(--vermilion);
+}
+
+.job-bar {
+  position: relative;
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  background: var(--rule-faint);
+}
+
+.job-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--vermilion);
+  transition: width 400ms ease;
+}
+
+.job-status.is-done .job-bar > span {
+  background: var(--sev-brilliant);
+}
+
+.job-bar.is-indeterminate > span {
+  width: 30%;
+  animation: job-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes job-slide {
+  from {
+    left: -30%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* The same bar inline, under the account that is being worked on in Settings. */
+.row-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  max-width: 320px;
+}
+
+.row-progress .meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 .headline-row {
@@ -1726,6 +1838,15 @@ a {
   animation: pulse 900ms ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .job-bar.is-indeterminate > span {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.4;
+  }
+}
+
 @keyframes pulse {
   0%,
   100% {
@@ -2079,9 +2200,8 @@ a {
     padding-top: 12px;
   }
 
-  .masthead {
-    grid-template-columns: 1fr;
-    gap: 14px;
+  .masthead-nav {
+    gap: 22px;
   }
 
   .stat-row {

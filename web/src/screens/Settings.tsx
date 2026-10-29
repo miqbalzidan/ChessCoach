@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api';
-import { ErrorNote, Loading } from '../components/Chrome';
+import { ErrorNote, JobBar, Loading } from '../components/Chrome';
+import { describeJob, isActive, jobFraction, useJobs } from '../jobs';
 import { pluralise, relativeTime } from '../format';
 import { downloadSnapshot, inSnapshotMode } from '../snapshot';
 import { SnapshotSettings } from './SnapshotSettings';
 import { Appearance } from '../components/Appearance';
 import { LocalDevice } from './LocalDevice';
-import type { Job, Settings as SettingsData } from '../types';
+import type { Settings as SettingsData } from '../types';
 
 export function Settings({
   activeUsername,
@@ -25,7 +26,9 @@ export function Settings({
   const [depth, setDepth] = useState(16);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [job, setJob] = useState<Job | null>(null);
+  const { job, track } = useJobs();
+  /** The job this screen started, so its ending is reported here and not another's. */
+  const [startedJob, setStartedJob] = useState<number | null>(null);
   /** The username currently being exported, so only its own button says so. */
   const [exporting, setExporting] = useState<string | null>(null);
 
@@ -42,19 +45,13 @@ export function Settings({
       );
   }, [snapshot]);
 
+  // The job tells the whole app when it finishes; this screen also says so in words,
+  // because "nothing pending" is an answer, and silence after a click is not one.
   useEffect(() => {
-    if (!job || job.status === 'done' || job.status === 'error') return;
-    const timer = window.setInterval(async () => {
-      try {
-        const response = await api.job(job.id);
-        setJob(response.job);
-        if (response.job.status === 'done') onChanged();
-      } catch {
-        // Leave the last known state in place.
-      }
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [job, onChanged]);
+    if (!job || job.id !== startedJob || isActive(job)) return;
+    setStatus(describeJob(job) + '.');
+    setStartedJob(null);
+  }, [job, startedJob]);
 
   if (snapshot) return <SnapshotSettings />;
 
@@ -113,7 +110,8 @@ export function Settings({
     setStatus(null);
     try {
       const response = await api.resync(username);
-      setJob((await api.job(response.jobId)).job);
+      setStartedJob(response.jobId);
+      await track(response.jobId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Re-sync failed');
     }
@@ -123,7 +121,8 @@ export function Settings({
     setStatus(null);
     try {
       const response = await api.analysePending(username);
-      setJob((await api.job(response.jobId)).job);
+      setStartedJob(response.jobId);
+      await track(response.jobId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not start analysis');
     }
@@ -163,7 +162,10 @@ export function Settings({
             Nothing imported yet.
           </div>
         ) : (
-          settings.players.map((player) => (
+          settings.players.map((player) => {
+            // One job at a time per player: a second click would queue the same games.
+            const running = isActive(job) && job.username === player.username;
+            return (
             <div
               key={player.id}
               className="row"
@@ -187,6 +189,14 @@ export function Settings({
                   {player.source} · synced {relativeTime(player.last_synced_at)}
                   {player.username === activeUsername ? ' · showing on the sheet' : ''}
                 </div>
+                {running ? (
+                  <div className="row-progress" role="status">
+                    <div className="meta">
+                      <span className="spinner-dot" /> {describeJob(job)}
+                    </div>
+                    <JobBar fraction={jobFraction(job)} />
+                  </div>
+                ) : null}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
@@ -200,6 +210,7 @@ export function Settings({
                 <button
                   type="button"
                   className="btn btn-ghost"
+                  disabled={running}
                   onClick={() => resync(player.username)}
                 >
                   re-sync
@@ -207,31 +218,32 @@ export function Settings({
                 <button
                   type="button"
                   className="btn btn-ghost"
+                  disabled={running}
                   onClick={() => analysePending(player.username)}
                 >
-                  analyse pending
+                  {running && job.stage === 'analysing' ? 'analysing…' : 'analyse pending'}
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost"
+                  disabled={running}
                   onClick={() => removeGames(player.username)}
                 >
                   delete games
                 </button>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 
-      {job && job.status !== 'done' ? (
-        <div style={{ margin: '20px var(--margin) 0' }}>
-          <div className="label" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="spinner-dot" />
-            {job.stage} {job.total > 0 ? `${job.analysed || job.imported}/${job.total}` : ''}
-          </div>
+      {/* Under the buttons that caused it, not under the depth slider a screen below. */}
+      {status && (
+        <div className="notice" style={{ margin: '20px var(--margin) 0' }}>
+          {status}
         </div>
-      ) : null}
+      )}
 
       <div className="section-head">
         <div className="label">analysis depth</div>
@@ -261,12 +273,6 @@ export function Settings({
           <span>8 — fast, shallow</span>
           <span>24 — slow, thorough</span>
         </div>
-
-        {status && (
-          <div className="notice" style={{ marginTop: 24 }}>
-            {status}
-          </div>
-        )}
 
         <div className="section-head" style={{ margin: '36px 0 0', padding: 0 }}>
           <div className="label">coaching layer</div>

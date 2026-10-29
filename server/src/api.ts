@@ -10,7 +10,7 @@ import {
   latestJob,
   runImport,
   runPgnImport,
-  analysePending,
+  analysePendingJob,
 } from '../../core/src/importer.js';
 import {
   deletePlayerData,
@@ -140,9 +140,7 @@ export function createApi(db: DB, pool: EnginePool): Router {
     if (!player) return res.status(404).json({ error: 'No such player' });
 
     const job = createJob(db, player.username);
-    void analysePending(db, pool, job.id, player.id, analysisDepth(db)).then(() => {
-      db.prepare("UPDATE import_jobs SET status = 'done', stage = 'done' WHERE id = ?").run(job.id);
-    });
+    void analysePendingJob(db, pool, job.id, player.id, analysisDepth(db));
     res.status(202).json({ jobId: job.id });
   });
 
